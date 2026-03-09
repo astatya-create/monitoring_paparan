@@ -689,15 +689,44 @@ def render_preview() -> bool:
     ext = file_path.suffix.lower()
     if ext == ".pdf":
         with file_path.open("rb") as f:
-            b64 = base64.b64encode(f.read()).decode("utf-8")
+            pdf_bytes = f.read()
+        b64 = base64.b64encode(pdf_bytes).decode("utf-8")
         st.markdown(
-            f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="900" style="border:none;border-radius:12px;"></iframe>',
+            f"""
+            <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:8px;">
+                <object
+                    data="data:application/pdf;base64,{b64}#view=FitH"
+                    type="application/pdf"
+                    width="100%"
+                    height="900"
+                    style="border:none;border-radius:10px;"
+                >
+                    <embed
+                        src="data:application/pdf;base64,{b64}#view=FitH"
+                        type="application/pdf"
+                        width="100%"
+                        height="900"
+                    />
+                </object>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
+        st.download_button(
+            "Download PDF",
+            data=pdf_bytes,
+            file_name=file_path.name,
+            mime="application/pdf",
+            use_container_width=False,
+        )
+    elif ext in [".png", ".jpg", ".jpeg", ".webp"]:
+        st.image(str(file_path), use_container_width=True)
+        with file_path.open("rb") as f:
+            st.download_button("Download file", f.read(), file_name=file_path.name, mime="image/*", use_container_width=False)
     else:
         with file_path.open("rb") as f:
-            st.download_button("Download file", f, file_name=file_path.name, use_container_width=False)
-        st.info("Preview inline saat ini hanya untuk PDF.")
+            st.download_button("Download file", f.read(), file_name=file_path.name, use_container_width=False)
+        st.info("Preview inline saat ini tersedia untuk PDF dan gambar.")
     return True
 
 
