@@ -51,16 +51,38 @@ def _extract_seed_users_from_ast(node: ast.AST) -> list[tuple[str, str, str]]:
             for target in subnode.targets:
                 if isinstance(target, ast.Name) and target.id == "users":
                     value = subnode.value
-                    if isinstance(value, (ast.List, ast.Tuple)):
-                        for item in value.elts:
-                            if not isinstance(item, (ast.List, ast.Tuple)) or len(item.elts) != 3:
-                                continue
+                    if not isinstance(value, (ast.List, ast.Tuple)):
+                        continue
+
+                    for item in value.elts:
+                        # Support format:
+                        # users = [("admin", "admin123", "admin"), ...]
+                        if isinstance(item, (ast.List, ast.Tuple)) and len(item.elts) == 3:
                             parts: list[str] = []
                             for elt in item.elts:
                                 if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
                                     parts.append(elt.value)
                             if len(parts) == 3:
                                 users.append((parts[0].strip(), parts[1], parts[2].strip().lower()))
+                            continue
+
+                        # Support format:
+                        # users = [{"username": "...", "password": "...", "role": "..."}, ...]
+                        if isinstance(item, ast.Dict):
+                            data: dict[str, str] = {}
+                            for key_node, val_node in zip(item.keys, item.values):
+                                if (
+                                    isinstance(key_node, ast.Constant)
+                                    and isinstance(key_node.value, str)
+                                    and isinstance(val_node, ast.Constant)
+                                    and isinstance(val_node.value, str)
+                                ):
+                                    data[key_node.value] = val_node.value
+                            username = data.get("username", "").strip()
+                            password = data.get("password", "")
+                            role = data.get("role", "").strip().lower()
+                            if username and password and role:
+                                users.append((username, password, role))
     return users
 
 
@@ -745,6 +767,9 @@ def load_data() -> pd.DataFrame:
     df["deadline"] = pd.to_datetime(df["deadline"], errors="coerce")
     df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0).astype(int)
     df["tahun"] = df["tgl_disposisi"].dt.year
+    if st.session_state.role == "pic":
+        user = st.session_state.user
+        df = df[(df["pic1"] == user) | (df["pic2"] == user)].copy()
     return df
 
 
@@ -1012,8 +1037,6 @@ def render_table(df: pd.DataFrame) -> None:
         c0.write(no)
         with c1:
             st.markdown(f"<div class='row-title'><strong>{row['nama_bahan']}</strong></div>", unsafe_allow_html=True)
-            if st.session_state.get("role") == "pic" and st.session_state.get("user") in {row.get("pic1"), row.get("pic2")}:
-                st.markdown("<div class='mini-text'><strong>• Tugas Anda</strong></div>", unsafe_allow_html=True)
             info = []
             if row["jenis_bahan"]:
                 info.append(str(row["jenis_bahan"]))
