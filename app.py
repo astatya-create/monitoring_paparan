@@ -767,9 +767,6 @@ def load_data() -> pd.DataFrame:
     df["deadline"] = pd.to_datetime(df["deadline"], errors="coerce")
     df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0).astype(int)
     df["tahun"] = df["tgl_disposisi"].dt.year
-    if st.session_state.role == "pic":
-        user = st.session_state.user
-        df = df[(df["pic1"] == user) | (df["pic2"] == user)].copy()
     return df
 
 
@@ -1037,6 +1034,8 @@ def render_table(df: pd.DataFrame) -> None:
         c0.write(no)
         with c1:
             st.markdown(f"<div class='row-title'><strong>{row['nama_bahan']}</strong></div>", unsafe_allow_html=True)
+            if st.session_state.get("role") == "pic" and st.session_state.get("user") in {row.get("pic1"), row.get("pic2")}:
+                st.markdown("<div class='mini-text'><strong>• Tugas Anda</strong></div>", unsafe_allow_html=True)
             info = []
             if row["jenis_bahan"]:
                 info.append(str(row["jenis_bahan"]))
