@@ -437,14 +437,27 @@ def render_login() -> None:
     left, center, right = st.columns([2.2, 2, 2.2])
     with center:
         st.markdown("<div class='login-wrap'>", unsafe_allow_html=True)
+
         if LOGO_PATH.exists():
-            st.image(str(LOGO_PATH), width=280)
+            logo_b64 = file_to_base64(LOGO_PATH)
+            st.markdown(
+                f"""
+                <div style="text-align:center; margin-bottom: 10px;">
+                    <img src="data:image/png;base64,{logo_b64}" width="280">
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
         st.markdown("<div class='login-title'>Dashboard Monitoring<br>Bahan Paparan</div>", unsafe_allow_html=True)
         st.markdown("<div class='login-subtitle'>Silakan masuk ke akun Anda</div>", unsafe_allow_html=True)
+
         st.markdown("<div class='login-label'>Username</div>", unsafe_allow_html=True)
         username = st.text_input("Username", label_visibility="collapsed", placeholder="")
+
         st.markdown("<div class='login-label'>Password</div>", unsafe_allow_html=True)
         password = st.text_input("Password", type="password", label_visibility="collapsed", placeholder="")
+
         if st.button("MASUK SEKARANG"):
             role = authenticate(username, password)
             if role:
@@ -452,6 +465,7 @@ def render_login() -> None:
                 st.session_state.role = role.lower()
                 st.rerun()
             st.error("Username atau password salah.")
+
         st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -882,6 +896,7 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
         fig.update_layout(showlegend=False, yaxis=dict(dtick=1), margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
+    st.markdown(f'<div class="section-title">Tren Bulanan dan Triwulanan ({tahun_pilih})</div>', unsafe_allow_html=True)
     c4, c5 = st.columns(2)
 
     if "tgl_disposisi" in df.columns:
@@ -892,7 +907,6 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
         df_trend["tgl_disposisi"] = pd.NaT
 
     with c4:
-        st.markdown(f'<div class="section-title">Tren Bahan Bulanan ({tahun_pilih})</div>', unsafe_allow_html=True)
         month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
         if df_trend["tgl_disposisi"].notna().any():
             df_trend["bulan_num"] = df_trend["tgl_disposisi"].dt.month
@@ -938,7 +952,6 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
             st.info("Belum ada data bulanan.")
 
     with c5:
-        st.markdown(f'<div class="section-title">Tren Triwulanan ({tahun_pilih})</div>', unsafe_allow_html=True)
         if df_trend["tgl_disposisi"].notna().any():
             df_trend["triwulan"] = df_trend["tgl_disposisi"].dt.quarter.map(lambda q: f"TW{int(q)}")
             tri_order = ["TW1", "TW2", "TW3", "TW4"]
