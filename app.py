@@ -198,6 +198,20 @@ def normalize_onedrive_link(value: str | None) -> str:
     return str(value).strip() if value else ""
 
 
+def get_doc_value(row, column_name: str) -> str:
+    value = row[column_name] if column_name in row.index else ""
+    return str(value).strip() if value else ""
+
+
+def doc_available(value: str | None) -> bool:
+    if not value:
+        return False
+    if is_url(value):
+        return True
+    file_path = safe_path(value)
+    return bool(file_path and file_path.exists())
+
+
 def dataframe_to_excel_bytes(df: pd.DataFrame) -> bytes:
     export_df = df.copy()
     for col in export_df.columns:
@@ -710,8 +724,9 @@ def render_preview() -> bool:
         return True
 
     if is_url(file_value):
-        st.info("Dokumen disimpan di OneDrive. Klik tombol di bawah untuk membuka dokumen.")
+        st.info("Dokumen disimpan di OneDrive. Preview inline tidak selalu didukung, jadi file dibuka melalui tautan langsung.")
         st.link_button("Buka Dokumen OneDrive", file_value, use_container_width=False)
+        st.caption(file_value)
         return True
 
     file_path = safe_path(file_value)
@@ -1088,10 +1103,12 @@ def render_table(df: pd.DataFrame) -> None:
                 st.markdown(f"<span class='deadline-alert'>⚠ {label} deadline</span>", unsafe_allow_html=True)
         with c2:
             st.write(row["kantor"] or "-")
-            surat = safe_path(row["file_surat"])
-            if surat and surat.exists():
-                if st.button("📩 Surat", key=f"surat_{row['id']}", use_container_width=True):
+            surat_value = get_doc_value(row, "file_surat")
+            if doc_available(surat_value):
+                if st.button("📩 Dispo", key=f"surat_{row['id']}", use_container_width=True):
                     open_preview(int(row["id"]), "surat")
+            else:
+                st.caption("Dispo: -")
         with c3:
             st.markdown(f"<div class='mini-text'>PIC 1: {row['pic1'] or '-'}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='mini-text'>PIC 2: {row['pic2'] or '-'}</div>", unsafe_allow_html=True)
@@ -1103,14 +1120,16 @@ def render_table(df: pd.DataFrame) -> None:
             st.progress(progress / 100)
             st.caption(f"{progress}%")
         with c6:
-            paparan = safe_path(row["file_paparan"])
-            narasi = safe_path(row["file_narasi"])
-            if paparan and paparan.exists():
-                if st.button("👁️ Paparan", key=f"paparan_{row['id']}", use_container_width=True):
+            paparan_value = get_doc_value(row, "file_paparan")
+            narasi_value = get_doc_value(row, "file_narasi")
+
+            if doc_available(paparan_value):
+                if st.button("📊 Paparan", key=f"paparan_{row['id']}", use_container_width=True):
                     open_preview(int(row["id"]), "paparan")
             else:
                 st.caption("Paparan: -")
-            if narasi and narasi.exists():
+
+            if doc_available(narasi_value):
                 if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
                     open_preview(int(row["id"]), "narasi")
             else:
