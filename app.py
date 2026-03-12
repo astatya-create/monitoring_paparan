@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import base64
 import sqlite3
+from io import BytesIO
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
@@ -51,38 +52,16 @@ def _extract_seed_users_from_ast(node: ast.AST) -> list[tuple[str, str, str]]:
             for target in subnode.targets:
                 if isinstance(target, ast.Name) and target.id == "users":
                     value = subnode.value
-                    if not isinstance(value, (ast.List, ast.Tuple)):
-                        continue
-
-                    for item in value.elts:
-                        # Support format:
-                        # users = [("admin", "admin123", "admin"), ...]
-                        if isinstance(item, (ast.List, ast.Tuple)) and len(item.elts) == 3:
+                    if isinstance(value, (ast.List, ast.Tuple)):
+                        for item in value.elts:
+                            if not isinstance(item, (ast.List, ast.Tuple)) or len(item.elts) != 3:
+                                continue
                             parts: list[str] = []
                             for elt in item.elts:
                                 if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
                                     parts.append(elt.value)
                             if len(parts) == 3:
                                 users.append((parts[0].strip(), parts[1], parts[2].strip().lower()))
-                            continue
-
-                        # Support format:
-                        # users = [{"username": "...", "password": "...", "role": "..."}, ...]
-                        if isinstance(item, ast.Dict):
-                            data: dict[str, str] = {}
-                            for key_node, val_node in zip(item.keys, item.values):
-                                if (
-                                    isinstance(key_node, ast.Constant)
-                                    and isinstance(key_node.value, str)
-                                    and isinstance(val_node, ast.Constant)
-                                    and isinstance(val_node.value, str)
-                                ):
-                                    data[key_node.value] = val_node.value
-                            username = data.get("username", "").strip()
-                            password = data.get("password", "")
-                            role = data.get("role", "").strip().lower()
-                            if username and password and role:
-                                users.append((username, password, role))
     return users
 
 
@@ -209,6 +188,26 @@ def save_uploaded_file(uploaded_file, target_dir: Path) -> str:
     with file_path.open("wb") as f:
         f.write(uploaded_file.getbuffer())
     return str(file_path.relative_to(BASE_DIR))
+
+
+def is_url(value: str | None) -> bool:
+    return bool(value) and str(value).strip().lower().startswith(("http://", "https://"))
+
+
+def normalize_onedrive_link(value: str | None) -> str:
+    return str(value).strip() if value else ""
+
+
+def dataframe_to_excel_bytes(df: pd.DataFrame) -> bytes:
+    export_df = df.copy()
+    for col in export_df.columns:
+        if pd.api.types.is_datetime64_any_dtype(export_df[col]):
+            export_df[col] = export_df[col].dt.strftime("%Y-%m-%d")
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        export_df.to_excel(writer, index=False, sheet_name="Daftar Bahan")
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 def logout() -> None:
@@ -537,7 +536,11 @@ def tambah_bahan_dialog() -> None:
         pic2 = st.selectbox("PIC 2", pic2_options, index=default_pic2, key="tb_pic2")
 
     instruksi = st.text_area("Keywords / Instruksi", height=120, key="tb_instruksi")
-    file_surat = st.file_uploader("Upload Surat / Disposisi", type=["pdf", "docx"], key="tb_file_surat")
+    file_surat_link = st.text_input(
+        "Link OneDrive Surat / Disposisi",
+        key="tb_file_surat_link",
+        placeholder="https://...",
+    )
 
     if st.button("Simpan", use_container_width=True, key="tb_simpan_btn"):
         if not nama.strip():
@@ -555,11 +558,6 @@ def tambah_bahan_dialog() -> None:
         if not existing.empty:
             st.error("Agenda dengan nama bahan dan deadline tersebut sudah ada.")
             return
-
-        file_path = ""
-        if file_surat:
-            tahun = pd.Timestamp(tgl_disposisi).year
-            file_path = save_uploaded_file(file_surat, STORAGE_DIR / "disposisi" / str(tahun))
 
         run_sql(
             """
@@ -579,11 +577,14 @@ def tambah_bahan_dialog() -> None:
                 str(deadline),
                 "Not Yet Started",
                 0,
-                file_path,
+                normalize_onedrive_link(file_surat_link),
             ),
         )
 
-        for k in ["tb_nama_bahan", "tb_tgl_disposisi", "tb_deadline", "tb_kantor", "tb_jenis", "tb_pic1", "tb_pic2", "tb_instruksi", "tb_file_surat"]:
+        for k in [
+            "tb_nama_bahan", "tb_tgl_disposisi", "tb_deadline", "tb_kantor",
+            "tb_jenis", "tb_pic1", "tb_pic2", "tb_instruksi", "tb_file_surat_link"
+        ]:
             st.session_state.pop(k, None)
 
         st.success("Bahan berhasil ditambahkan.")
@@ -597,33 +598,55 @@ def edit_dialog(edit_id: int) -> None:
         return
 
     row = df_edit.iloc[0]
-    status = st.selectbox("Status", STATUS_OPTIONS, index=STATUS_OPTIONS.index(row["status"]))
-    progress = st.slider("Progress (%)", 0, 100, int(row["progress"] or 0))
+    current_status = row["status"] if row["status"] in STATUS_OPTIONS else STATUS_OPTIONS[0]
+    status = st.selectbox("Status", STATUS_OPTIONS, index=STATUS_OPTIONS.index(current_status))
+
     if status == "Done":
         progress = 100
+        st.slider("Progress (%)", 0, 100, 100, disabled=True)
+    else:
+        progress = st.slider("Progress (%)", 0, 100, int(row["progress"] or 0))
+
     keterangan = st.text_area("Keterangan", row["keterangan"] or "")
     instruksi = st.text_area("Keywords / Instruksi", row["instruksi"] or "", height=120)
-    file_paparan = st.file_uploader("Upload Paparan", type=["pdf"])
-    file_narasi = st.file_uploader("Upload Narasi")
+
+    st.markdown("#### Link OneDrive Dokumen")
+    file_surat_link = st.text_input(
+        "Link OneDrive Surat / Disposisi",
+        value=row["file_surat"] or "",
+        placeholder="https://...",
+    )
+    file_paparan_link = st.text_input(
+        "Link OneDrive Paparan",
+        value=row["file_paparan"] or "",
+        placeholder="https://...",
+    )
+    file_narasi_link = st.text_input(
+        "Link OneDrive Narasi",
+        value=row["file_narasi"] or "",
+        placeholder="https://...",
+    )
 
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Simpan", use_container_width=True):
-            pap_path = row["file_paparan"] or ""
-            nar_path = row["file_narasi"] or ""
-            if file_paparan:
-                pap_path = save_uploaded_file(file_paparan, STORAGE_DIR / "output" / "paparan")
-            if file_narasi:
-                nar_path = save_uploaded_file(file_narasi, STORAGE_DIR / "output" / "narasi")
-
             run_sql(
                 """
                 UPDATE bahan
                 SET status = ?, progress = ?, keterangan = ?, instruksi = ?,
-                    file_paparan = ?, file_narasi = ?
+                    file_surat = ?, file_paparan = ?, file_narasi = ?
                 WHERE id = ?
                 """,
-                (status, progress, keterangan, instruksi, pap_path, nar_path, edit_id),
+                (
+                    status,
+                    100 if status == "Done" else progress,
+                    keterangan,
+                    instruksi,
+                    normalize_onedrive_link(file_surat_link),
+                    normalize_onedrive_link(file_paparan_link),
+                    normalize_onedrive_link(file_narasi_link),
+                    edit_id,
+                ),
             )
             log_action(edit_id, st.session_state.user, "update bahan")
             st.success("Data berhasil diupdate.")
@@ -673,7 +696,7 @@ def render_preview() -> bool:
 
     row = df_prev.iloc[0]
     col_name, title = column_map[kind]
-    file_path = safe_path(row[col_name])
+    file_value = row[col_name]
 
     c1, c2 = st.columns([1, 5])
     with c1:
@@ -682,6 +705,16 @@ def render_preview() -> bool:
     with c2:
         st.markdown(f"### {title} — {row['nama_bahan']}")
 
+    if not file_value:
+        st.info("File belum tersedia.")
+        return True
+
+    if is_url(file_value):
+        st.info("Dokumen disimpan di OneDrive. Klik tombol di bawah untuk membuka dokumen.")
+        st.link_button("Buka Dokumen OneDrive", file_value, use_container_width=False)
+        return True
+
+    file_path = safe_path(file_value)
     if not file_path or not file_path.exists():
         st.info("File belum tersedia.")
         return True
@@ -690,15 +723,6 @@ def render_preview() -> bool:
     if ext == ".pdf":
         with file_path.open("rb") as f:
             pdf_bytes = f.read()
-        st.markdown(
-            "<div style='background:white;border:1px solid #e5e7eb;border-radius:12px;padding:8px;'>",
-            unsafe_allow_html=True,
-        )
-        if hasattr(st, "pdf"):
-            st.pdf(pdf_bytes, height=900)
-        else:
-            st.warning("Preview PDF inline belum tersedia pada versi Streamlit ini. Silakan gunakan tombol download.")
-        st.markdown("</div>", unsafe_allow_html=True)
         st.download_button(
             "Download PDF",
             data=pdf_bytes,
@@ -706,20 +730,11 @@ def render_preview() -> bool:
             mime="application/pdf",
             use_container_width=False,
         )
-    elif ext in [".png", ".jpg", ".jpeg", ".webp"]:
-        st.image(str(file_path), use_container_width=True)
-        with file_path.open("rb") as f:
-            st.download_button(
-                "Download file",
-                f.read(),
-                file_name=file_path.name,
-                mime="image/*",
-                use_container_width=False,
-            )
+        st.info("File lokal tersedia untuk diunduh.")
     else:
         with file_path.open("rb") as f:
             st.download_button("Download file", f.read(), file_name=file_path.name, use_container_width=False)
-        st.info("Preview inline saat ini tersedia untuk PDF dan gambar.")
+        st.info("Preview inline saat ini tersedia melalui tautan OneDrive atau download file.")
     return True
 
 
@@ -789,6 +804,9 @@ def load_data() -> pd.DataFrame:
     df["deadline"] = pd.to_datetime(df["deadline"], errors="coerce")
     df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0).astype(int)
     df["tahun"] = df["tgl_disposisi"].dt.year
+    if st.session_state.role == "pic":
+        user = st.session_state.user
+        df = df[(df["pic1"] == user) | (df["pic2"] == user)].copy()
     return df
 
 
@@ -1056,8 +1074,6 @@ def render_table(df: pd.DataFrame) -> None:
         c0.write(no)
         with c1:
             st.markdown(f"<div class='row-title'><strong>{row['nama_bahan']}</strong></div>", unsafe_allow_html=True)
-            if st.session_state.get("role") == "pic" and st.session_state.get("user") in {row.get("pic1"), row.get("pic2")}:
-                st.markdown("<div class='mini-text'><strong>• Tugas Anda</strong></div>", unsafe_allow_html=True)
             info = []
             if row["jenis_bahan"]:
                 info.append(str(row["jenis_bahan"]))
@@ -1159,9 +1175,28 @@ def render_dashboard() -> None:
         st.info("Tidak ada data yang cocok dengan filter.")
         return
 
+    sorted_filtered = sort_bahan_df(filtered)
+
+    export_columns = [
+        "tgl_disposisi", "nama_bahan", "kantor", "jenis_bahan", "pic1", "pic2",
+        "deadline", "status", "progress", "keterangan", "instruksi",
+        "file_surat", "file_paparan", "file_narasi",
+    ]
+    export_df = sorted_filtered[[c for c in export_columns if c in sorted_filtered.columns]].copy()
+
+    with st.sidebar:
+        st.markdown("---")
+        st.download_button(
+            "Ekspor Excel",
+            data=dataframe_to_excel_bytes(export_df),
+            file_name=f"daftar_bahan_pimpinan_{tahun_pilih}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
     render_kpi(filtered)
     render_charts(filtered, tahun_pilih)
-    render_table(sort_bahan_df(filtered))
+    render_table(sorted_filtered)
 
 
 def main() -> None:
