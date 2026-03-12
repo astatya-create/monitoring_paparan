@@ -13,7 +13,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-st.set_page_config(page_title="Monitoring Bahan Paparan", layout="wide")
+st.set_page_config(page_title="Monitoring Disposisi Bahan Pimpinan", layout="wide")
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_NAME = BASE_DIR / "monitoring.db"
@@ -227,6 +227,42 @@ def dataframe_to_excel_bytes(df: pd.DataFrame) -> bytes:
 def logout() -> None:
     st.session_state.clear()
     st.rerun()
+
+
+@st.dialog("Ganti Password")
+def change_password_dialog() -> None:
+    st.markdown("### Ganti Password")
+    current_password = st.text_input("Password Saat Ini", type="password", key="cp_current")
+    new_password = st.text_input("Password Baru", type="password", key="cp_new")
+    confirm_password = st.text_input("Konfirmasi Password Baru", type="password", key="cp_confirm")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Simpan Password", use_container_width=True, key="cp_save"):
+            username = st.session_state.get("user", "")
+            role = authenticate(username, current_password)
+            if not role:
+                st.error("Password saat ini salah.")
+                return
+            if not new_password:
+                st.error("Password baru wajib diisi.")
+                return
+            if len(new_password) < 6:
+                st.error("Password baru minimal 6 karakter.")
+                return
+            if new_password != confirm_password:
+                st.error("Konfirmasi password tidak sama.")
+                return
+            run_sql("UPDATE users SET password = ? WHERE username = ?", (new_password, username))
+            st.success("Password berhasil diperbarui.")
+            for k in ["cp_current", "cp_new", "cp_confirm"]:
+                st.session_state.pop(k, None)
+            st.rerun()
+    with col2:
+        if st.button("Batal", use_container_width=True, key="cp_cancel"):
+            for k in ["cp_current", "cp_new", "cp_confirm"]:
+                st.session_state.pop(k, None)
+            st.rerun()
 
 
 def open_preview(row_id: int, kind: str) -> None:
@@ -494,7 +530,7 @@ def render_login() -> None:
                 unsafe_allow_html=True,
             )
 
-        st.markdown("<div class='login-title'>Dashboard Monitoring<br>Bahan Paparan</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-title'>Dashboard Monitoring<br>Disposisi Bahan Pimpinan</div>", unsafe_allow_html=True)
         st.markdown("<div class='login-subtitle'>Silakan masuk ke akun Anda</div>", unsafe_allow_html=True)
 
         st.markdown("<div class='login-label'>Username</div>", unsafe_allow_html=True)
@@ -503,7 +539,7 @@ def render_login() -> None:
         st.markdown("<div class='login-label'>Password</div>", unsafe_allow_html=True)
         password = st.text_input("Password", type="password", label_visibility="collapsed", placeholder="")
 
-        if st.button("MASUK SEKARANG"):
+        if st.button("MASUK"):
             role = authenticate(username, password)
             if role:
                 st.session_state.user = username.strip()
@@ -868,7 +904,7 @@ def render_header() -> None:
                 <div class="header-left">
                     {logo_html}
                     <div>
-                        <div class="header-title">Dashboard Monitoring Penyusunan Bahan Paparan Pimpinan</div>
+                        <div class="header-title">Dashboard Monitoring Disposisi Penyusunan Bahan Pimpinan</div>
                         <div class="header-subtitle">PDSIA Pusat &amp; Tulodong</div>
                     </div>
                 </div>
@@ -1166,6 +1202,8 @@ def render_dashboard() -> None:
         st.markdown(f"**Login sebagai:** {st.session_state.user} ({st.session_state.role})")
         if st.button("Tambah Bahan", use_container_width=True):
             tambah_bahan_dialog()
+        if st.button("Ganti Password", use_container_width=True):
+            change_password_dialog()
         if st.button("Logout", use_container_width=True):
             logout()
 
