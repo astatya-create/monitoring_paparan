@@ -724,17 +724,8 @@ def render_preview() -> bool:
         return True
 
     if is_url(file_value):
-        st.info("Dokumen berasal dari OneDrive. Halaman akan langsung diarahkan ke preview dokumen.")
-        st.markdown(
-            f"""
-            <meta http-equiv="refresh" content="0; url={file_value}">
-            <script>
-                window.open("{file_value}", "_blank");
-            </script>
-            <p>Jika dokumen tidak terbuka otomatis, klik <a href="{file_value}" target="_blank">preview OneDrive</a>.</p>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.warning("OneDrive menolak ditampilkan di dalam halaman dashboard. Dokumen harus dibuka langsung di tab baru.")
+        st.link_button("Buka Preview OneDrive", file_value, use_container_width=False)
         return True
 
     file_path = safe_path(file_value)
@@ -1113,8 +1104,11 @@ def render_table(df: pd.DataFrame) -> None:
             st.write(row["kantor"] or "-")
             surat_value = get_doc_value(row, "file_surat")
             if doc_available(surat_value):
-                if st.button("📩 Dispo", key=f"surat_{row['id']}", use_container_width=True):
-                    open_preview(int(row["id"]), "surat")
+                if is_url(surat_value):
+                    st.link_button("📩 Dispo", surat_value, use_container_width=True)
+                else:
+                    if st.button("📩 Dispo", key=f"surat_{row['id']}", use_container_width=True):
+                        open_preview(int(row["id"]), "surat")
             else:
                 st.caption("Dispo: -")
         with c3:
@@ -1132,14 +1126,20 @@ def render_table(df: pd.DataFrame) -> None:
             narasi_value = get_doc_value(row, "file_narasi")
 
             if doc_available(paparan_value):
-                if st.button("📊 Paparan", key=f"paparan_{row['id']}", use_container_width=True):
-                    open_preview(int(row["id"]), "paparan")
+                if is_url(paparan_value):
+                    st.link_button("📊 Paparan", paparan_value, use_container_width=True)
+                else:
+                    if st.button("📊 Paparan", key=f"paparan_{row['id']}", use_container_width=True):
+                        open_preview(int(row["id"]), "paparan")
             else:
                 st.caption("Paparan: -")
 
             if doc_available(narasi_value):
-                if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
-                    open_preview(int(row["id"]), "narasi")
+                if is_url(narasi_value):
+                    st.link_button("📝 Narasi", narasi_value, use_container_width=True)
+                else:
+                    if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
+                        open_preview(int(row["id"]), "narasi")
             else:
                 st.caption("Narasi: -")
         with c7:
