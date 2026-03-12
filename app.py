@@ -724,9 +724,17 @@ def render_preview() -> bool:
         return True
 
     if is_url(file_value):
-        st.info("Dokumen disimpan di OneDrive. Preview inline tidak selalu didukung, jadi file dibuka melalui tautan langsung.")
-        st.link_button("Buka Dokumen OneDrive", file_value, use_container_width=False)
-        st.caption(file_value)
+        st.info("Dokumen berasal dari OneDrive. Halaman akan langsung diarahkan ke preview dokumen.")
+        st.markdown(
+            f"""
+            <meta http-equiv="refresh" content="0; url={file_value}">
+            <script>
+                window.open("{file_value}", "_blank");
+            </script>
+            <p>Jika dokumen tidak terbuka otomatis, klik <a href="{file_value}" target="_blank">preview OneDrive</a>.</p>
+            """,
+            unsafe_allow_html=True,
+        )
         return True
 
     file_path = safe_path(file_value)
