@@ -817,9 +817,8 @@ def load_data() -> pd.DataFrame:
     df["deadline"] = pd.to_datetime(df["deadline"], errors="coerce")
     df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0).astype(int)
     df["tahun"] = df["tgl_disposisi"].dt.year
-    if st.session_state.role == "pic":
-        user = st.session_state.user
-        df = df[(df["pic1"] == user) | (df["pic2"] == user)].copy()
+    tri_map = {1: "I", 2: "I", 3: "I", 4: "II", 5: "II", 6: "II", 7: "III", 8: "III", 9: "III", 10: "IV", 11: "IV", 12: "IV"}
+    df["triwulan"] = df["tgl_disposisi"].dt.month.map(tri_map)
     return df
 
 
@@ -1087,6 +1086,8 @@ def render_table(df: pd.DataFrame) -> None:
         c0.write(no)
         with c1:
             st.markdown(f"<div class='row-title'><strong>{row['nama_bahan']}</strong></div>", unsafe_allow_html=True)
+            if st.session_state.get("role") == "pic" and st.session_state.get("user") in {row.get("pic1"), row.get("pic2")}:
+                st.markdown("<div class='mini-text'><strong>• Tugas Anda</strong></div>", unsafe_allow_html=True)
             info = []
             if row["jenis_bahan"]:
                 info.append(str(row["jenis_bahan"]))
@@ -1180,13 +1181,18 @@ def render_dashboard() -> None:
         st.subheader("Filter Data")
         tahun_list = sorted(df["tahun"].dropna().unique().tolist())
         tahun_pilih = st.selectbox("Tahun", tahun_list)
+        triwulan_filter = st.selectbox("Triwulan", ["Semua", "I", "II", "III", "IV"])
         keyword = st.text_input("Search Keyword", placeholder="Nama bahan / instruksi")
         pic_list = sorted(pd.concat([df["pic1"], df["pic2"]]).dropna().unique().tolist())
         pic_filter = st.selectbox("PIC", ["Semua"] + pic_list)
         kantor_list = sorted(df["kantor"].dropna().unique().tolist())
         kantor_filter = st.selectbox("Kantor", ["Semua"] + kantor_list)
+        jenis_list = sorted(df["jenis_bahan"].dropna().unique().tolist())
+        jenis_filter = st.selectbox("Jenis Bahan", ["Semua"] + jenis_list)
 
     filtered = df[df["tahun"] == tahun_pilih].copy()
+    if triwulan_filter != "Semua":
+        filtered = filtered[filtered["triwulan"] == triwulan_filter]
     if keyword.strip():
         key = keyword.strip().lower()
         filtered = filtered[
@@ -1197,6 +1203,8 @@ def render_dashboard() -> None:
         filtered = filtered[(filtered["pic1"] == pic_filter) | (filtered["pic2"] == pic_filter)]
     if kantor_filter != "Semua":
         filtered = filtered[filtered["kantor"] == kantor_filter]
+    if jenis_filter != "Semua":
+        filtered = filtered[filtered["jenis_bahan"] == jenis_filter]
 
     if filtered.empty:
         st.info("Tidak ada data yang cocok dengan filter.")
