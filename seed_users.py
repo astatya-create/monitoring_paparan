@@ -2,20 +2,20 @@ from database import db
 
 # GANTI daftar user ini sesuai tim kamu (15 orang)
 users = [
-    {"username": "admin", "password": "admin123", "role": "admin"},
-    {"username": "catur", "password": "catur123", "role": "atasan"},
-    {"username": "agung", "password": "agung123", "role": "pic"},
-    {"username": "asto", "password": "asto123", "role": "pic"},
-    {"username": "nauval", "password": "nauval123", "role": "pic"},
-    {"username": "devin", "password": "devin123", "role": "pic"},
-    {"username": "farid", "password": "farid123", "role": "pic"},
-    {"username": "intan", "password": "intan123", "role": "pic"},
-    {"username": "gunawan", "password": "gunawan123", "role": "pic"},
-    {"username": "afi", "password": "afi123", "role": "pic"},
-    {"username": "romadhon", "password": "romadhon123", "role": "pic"},
-    {"username": "ginanjar", "password": "ginanjar123", "role": "pic"},  
-    {"username": "danang", "password": "danang123", "role": "pic"}, 
-    {"username": "yuwono", "password": "yuwono123", "role": "pic"}
+    {"username": "admin", "password": "Admin123$", "role": "admin"},
+    {"username": "catur", "password": "Catur123$", "role": "atasan"},
+    {"username": "agung", "password": "Agung123$", "role": "pic"},
+    {"username": "asto", "password": "Asto123$", "role": "pic"},
+    {"username": "nauval", "password": "Nauval123$", "role": "pic"},
+    {"username": "devin", "password": "Devin123$", "role": "pic"},
+    {"username": "farid", "password": "Farid123$", "role": "pic"},
+    {"username": "intan", "password": "Intan123$", "role": "pic"},
+    {"username": "gunawan", "password": "Gunawan123$", "role": "pic"},
+    {"username": "afi", "password": "Afi123$", "role": "pic"},
+    {"username": "romadhon", "password": "Romadhon123$", "role": "pic"},
+    {"username": "ginanjar", "password": "Ginanjar123$", "role": "pic"},  
+    {"username": "danang", "password": "Danang123$", "role": "pic"}, 
+    {"username": "yuwono", "password": "Yuwono123$", "role": "pic"}
 ]
 
 for user in users:
