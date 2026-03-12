@@ -198,6 +198,20 @@ def normalize_onedrive_link(value: str | None) -> str:
     return str(value).strip() if value else ""
 
 
+def get_doc_value(row, column_name: str) -> str:
+    value = row[column_name] if column_name in row.index else ""
+    return str(value).strip() if value else ""
+
+
+def doc_available(value: str | None) -> bool:
+    if not value:
+        return False
+    if is_url(value):
+        return True
+    file_path = safe_path(value)
+    return bool(file_path and file_path.exists())
+
+
 def dataframe_to_excel_bytes(df: pd.DataFrame) -> bytes:
     export_df = df.copy()
     for col in export_df.columns:
@@ -230,7 +244,7 @@ def close_preview() -> None:
 @st.dialog("Link Dokumen")
 def show_link_dialog(title: str, url: str) -> None:
     st.markdown(f"### {title}")
-    st.write("Salin link berikut atau buka langsung di tab baru.")
+    st.write("Dokumen disimpan di OneDrive.")
     st.link_button("Buka Dokumen", url, use_container_width=True)
     st.code(url, language=None)
     if st.button("Tutup", use_container_width=True):
@@ -546,11 +560,9 @@ def tambah_bahan_dialog() -> None:
         pic2 = st.selectbox("PIC 2", pic2_options, index=default_pic2, key="tb_pic2")
 
     instruksi = st.text_area("Keywords / Instruksi", height=120, key="tb_instruksi")
-    file_surat_link = st.text_input(
-        "Link OneDrive Surat / Disposisi",
-        key="tb_file_surat_link",
-        placeholder="https://...",
-    )
+    file_surat_link = st.text_input("Link OneDrive Surat / Disposisi", key="tb_file_surat_link", placeholder="https://...")
+    file_paparan_link = st.text_input("Link OneDrive Paparan", key="tb_file_paparan_link", placeholder="https://...")
+    file_narasi_link = st.text_input("Link OneDrive Narasi", key="tb_file_narasi_link", placeholder="https://...")
 
     if st.button("Simpan", use_container_width=True, key="tb_simpan_btn"):
         if not nama.strip():
@@ -573,8 +585,8 @@ def tambah_bahan_dialog() -> None:
             """
             INSERT INTO bahan (
                 tgl_disposisi, nama_bahan, pic1, pic2, kantor, jenis_bahan,
-                instruksi, deadline, status, progress, file_surat
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                instruksi, deadline, status, progress, file_surat, file_paparan, file_narasi
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(tgl_disposisi),
@@ -588,17 +600,21 @@ def tambah_bahan_dialog() -> None:
                 "Not Yet Started",
                 0,
                 normalize_onedrive_link(file_surat_link),
+                normalize_onedrive_link(file_paparan_link),
+                normalize_onedrive_link(file_narasi_link),
             ),
         )
 
         for k in [
             "tb_nama_bahan", "tb_tgl_disposisi", "tb_deadline", "tb_kantor",
-            "tb_jenis", "tb_pic1", "tb_pic2", "tb_instruksi", "tb_file_surat_link"
+            "tb_jenis", "tb_pic1", "tb_pic2", "tb_instruksi",
+            "tb_file_surat_link", "tb_file_paparan_link", "tb_file_narasi_link"
         ]:
             st.session_state.pop(k, None)
 
         st.success("Bahan berhasil ditambahkan.")
         st.rerun()
+
 
 @st.dialog("Edit Bahan Paparan")
 def edit_dialog(edit_id: int) -> None:
@@ -621,21 +637,9 @@ def edit_dialog(edit_id: int) -> None:
     instruksi = st.text_area("Keywords / Instruksi", row["instruksi"] or "", height=120)
 
     st.markdown("#### Link OneDrive Dokumen")
-    file_surat_link = st.text_input(
-        "Link OneDrive Surat / Disposisi",
-        value=row["file_surat"] or "",
-        placeholder="https://...",
-    )
-    file_paparan_link = st.text_input(
-        "Link OneDrive Paparan",
-        value=row["file_paparan"] or "",
-        placeholder="https://...",
-    )
-    file_narasi_link = st.text_input(
-        "Link OneDrive Narasi",
-        value=row["file_narasi"] or "",
-        placeholder="https://...",
-    )
+    file_surat_link = st.text_input("Link OneDrive Surat / Disposisi", value=row["file_surat"] or "", placeholder="https://...")
+    file_paparan_link = st.text_input("Link OneDrive Paparan", value=row["file_paparan"] or "", placeholder="https://...")
+    file_narasi_link = st.text_input("Link OneDrive Narasi", value=row["file_narasi"] or "", placeholder="https://...")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -688,9 +692,9 @@ def render_preview() -> bool:
         return False
 
     column_map = {
-        "surat": ("file_surat", "Preview Surat"),
-        "paparan": ("file_paparan", "Preview Paparan"),
-        "narasi": ("file_narasi", "Preview Narasi"),
+        "surat": ("file_surat", "Link Disposisi"),
+        "paparan": ("file_paparan", "Link Paparan"),
+        "narasi": ("file_narasi", "Link Narasi"),
     }
     if kind not in column_map:
         close_preview()
@@ -716,18 +720,18 @@ def render_preview() -> bool:
         st.markdown(f"### {title} — {row['nama_bahan']}")
 
     if not file_value:
-        st.info("File belum tersedia.")
+        st.info("Link belum tersedia.")
         return True
 
     if is_url(file_value):
         st.info("Dokumen disimpan di OneDrive.")
-        st.link_button("Buka Dokumen OneDrive", file_value, use_container_width=False)
+        st.link_button("Buka Dokumen", file_value, use_container_width=False)
         st.code(file_value, language=None)
         return True
 
     file_path = safe_path(file_value)
     if not file_path or not file_path.exists():
-        st.info("File belum tersedia.")
+        st.info("File atau link belum tersedia.")
         return True
 
     ext = file_path.suffix.lower()
@@ -741,11 +745,9 @@ def render_preview() -> bool:
             mime="application/pdf",
             use_container_width=False,
         )
-        st.info("File lokal tersedia untuk diunduh.")
     else:
         with file_path.open("rb") as f:
             st.download_button("Download file", f.read(), file_name=file_path.name, use_container_width=False)
-        st.info("Preview inline saat ini tersedia melalui tautan OneDrive atau download file.")
     return True
 
 
@@ -1099,10 +1101,14 @@ def render_table(df: pd.DataFrame) -> None:
                 st.markdown(f"<span class='deadline-alert'>⚠ {label} deadline</span>", unsafe_allow_html=True)
         with c2:
             st.write(row["kantor"] or "-")
-            surat = safe_path(row["file_surat"])
-            if surat and surat.exists():
-                if st.button("📩 Surat", key=f"surat_{row['id']}", use_container_width=True):
-                    open_preview(int(row["id"]), "surat")
+            surat_value = get_doc_value(row, "file_surat")
+            if doc_available(surat_value):
+                if is_url(surat_value):
+                    if st.button("📩 Dispo", key=f"surat_{row['id']}", use_container_width=True):
+                        show_link_dialog("Link Disposisi", surat_value)
+                else:
+                    if st.button("📩 Dispo", key=f"surat_{row['id']}", use_container_width=True):
+                        open_preview(int(row["id"]), "surat")
         with c3:
             st.markdown(f"<div class='mini-text'>PIC 1: {row['pic1'] or '-'}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='mini-text'>PIC 2: {row['pic2'] or '-'}</div>", unsafe_allow_html=True)
@@ -1114,16 +1120,26 @@ def render_table(df: pd.DataFrame) -> None:
             st.progress(progress / 100)
             st.caption(f"{progress}%")
         with c6:
-            paparan = safe_path(row["file_paparan"])
-            narasi = safe_path(row["file_narasi"])
-            if paparan and paparan.exists():
-                if st.button("👁️ Paparan", key=f"paparan_{row['id']}", use_container_width=True):
-                    open_preview(int(row["id"]), "paparan")
+            paparan_value = get_doc_value(row, "file_paparan")
+            narasi_value = get_doc_value(row, "file_narasi")
+
+            if doc_available(paparan_value):
+                if is_url(paparan_value):
+                    if st.button("📊 Paparan", key=f"paparan_{row['id']}", use_container_width=True):
+                        show_link_dialog("Link Paparan", paparan_value)
+                else:
+                    if st.button("📊 Paparan", key=f"paparan_{row['id']}", use_container_width=True):
+                        open_preview(int(row["id"]), "paparan")
             else:
                 st.caption("Paparan: -")
-            if narasi and narasi.exists():
-                if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
-                    open_preview(int(row["id"]), "narasi")
+
+            if doc_available(narasi_value):
+                if is_url(narasi_value):
+                    if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
+                        show_link_dialog("Link Narasi", narasi_value)
+                else:
+                    if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
+                        open_preview(int(row["id"]), "narasi")
             else:
                 st.caption("Narasi: -")
         with c7:
