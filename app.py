@@ -198,20 +198,6 @@ def normalize_onedrive_link(value: str | None) -> str:
     return str(value).strip() if value else ""
 
 
-def get_doc_value(row, column_name: str) -> str:
-    value = row[column_name] if column_name in row.index else ""
-    return str(value).strip() if value else ""
-
-
-def doc_available(value: str | None) -> bool:
-    if not value:
-        return False
-    if is_url(value):
-        return True
-    file_path = safe_path(value)
-    return bool(file_path and file_path.exists())
-
-
 def dataframe_to_excel_bytes(df: pd.DataFrame) -> bytes:
     export_df = df.copy()
     for col in export_df.columns:
@@ -550,11 +536,7 @@ def tambah_bahan_dialog() -> None:
         pic2 = st.selectbox("PIC 2", pic2_options, index=default_pic2, key="tb_pic2")
 
     instruksi = st.text_area("Keywords / Instruksi", height=120, key="tb_instruksi")
-    file_surat_link = st.text_input(
-        "Link OneDrive Surat / Disposisi",
-        key="tb_file_surat_link",
-        placeholder="https://...",
-    )
+    file_surat = st.file_uploader("Upload Surat / Disposisi", type=["pdf", "docx"], key="tb_file_surat")
 
     if st.button("Simpan", use_container_width=True, key="tb_simpan_btn"):
         if not nama.strip():
@@ -572,6 +554,11 @@ def tambah_bahan_dialog() -> None:
         if not existing.empty:
             st.error("Agenda dengan nama bahan dan deadline tersebut sudah ada.")
             return
+
+        file_path = ""
+        if file_surat:
+            tahun = pd.Timestamp(tgl_disposisi).year
+            file_path = save_uploaded_file(file_surat, STORAGE_DIR / "disposisi" / str(tahun))
 
         run_sql(
             """
@@ -591,13 +578,13 @@ def tambah_bahan_dialog() -> None:
                 str(deadline),
                 "Not Yet Started",
                 0,
-                normalize_onedrive_link(file_surat_link),
+                file_path,
             ),
         )
 
         for k in [
             "tb_nama_bahan", "tb_tgl_disposisi", "tb_deadline", "tb_kantor",
-            "tb_jenis", "tb_pic1", "tb_pic2", "tb_instruksi", "tb_file_surat_link"
+            "tb_jenis", "tb_pic1", "tb_pic2", "tb_instruksi", "tb_file_surat"
         ]:
             st.session_state.pop(k, None)
 
@@ -624,26 +611,25 @@ def edit_dialog(edit_id: int) -> None:
     keterangan = st.text_area("Keterangan", row["keterangan"] or "")
     instruksi = st.text_area("Keywords / Instruksi", row["instruksi"] or "", height=120)
 
-    st.markdown("#### Link OneDrive Dokumen")
-    file_surat_link = st.text_input(
-        "Link OneDrive Surat / Disposisi",
-        value=row["file_surat"] or "",
-        placeholder="https://...",
-    )
-    file_paparan_link = st.text_input(
-        "Link OneDrive Paparan",
-        value=row["file_paparan"] or "",
-        placeholder="https://...",
-    )
-    file_narasi_link = st.text_input(
-        "Link OneDrive Narasi",
-        value=row["file_narasi"] or "",
-        placeholder="https://...",
-    )
+    st.markdown("#### Upload Dokumen")
+    file_surat = st.file_uploader("Upload Surat / Disposisi", type=["pdf", "docx"], key=f"edit_surat_{edit_id}")
+    file_paparan = st.file_uploader("Upload Paparan", type=["pdf"], key=f"edit_paparan_{edit_id}")
+    file_narasi = st.file_uploader("Upload Narasi", key=f"edit_narasi_{edit_id}")
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Simpan", use_container_width=True):
+        if st.button("Simpan", use_container_width=True, key=f"simpan_edit_{edit_id}"):
+            surat_path = row["file_surat"] or ""
+            pap_path = row["file_paparan"] or ""
+            nar_path = row["file_narasi"] or ""
+
+            if file_surat:
+                surat_path = save_uploaded_file(file_surat, STORAGE_DIR / "disposisi")
+            if file_paparan:
+                pap_path = save_uploaded_file(file_paparan, STORAGE_DIR / "output" / "paparan")
+            if file_narasi:
+                nar_path = save_uploaded_file(file_narasi, STORAGE_DIR / "output" / "narasi")
+
             run_sql(
                 """
                 UPDATE bahan
@@ -656,9 +642,9 @@ def edit_dialog(edit_id: int) -> None:
                     100 if status == "Done" else progress,
                     keterangan,
                     instruksi,
-                    normalize_onedrive_link(file_surat_link),
-                    normalize_onedrive_link(file_paparan_link),
-                    normalize_onedrive_link(file_narasi_link),
+                    surat_path,
+                    pap_path,
+                    nar_path,
                     edit_id,
                 ),
             )
@@ -666,7 +652,7 @@ def edit_dialog(edit_id: int) -> None:
             st.success("Data berhasil diupdate.")
             st.rerun()
     with col2:
-        if st.button("Batal", use_container_width=True):
+        if st.button("Batal", use_container_width=True, key=f"batal_edit_{edit_id}"):
             st.rerun()
 
 
@@ -723,32 +709,35 @@ def render_preview() -> bool:
         st.info("File belum tersedia.")
         return True
 
-    if is_url(file_value):
-        st.warning("OneDrive menolak ditampilkan di dalam halaman dashboard. Dokumen harus dibuka langsung di tab baru.")
-        st.link_button("Buka Preview OneDrive", file_value, use_container_width=False)
-        return True
-
     file_path = safe_path(file_value)
     if not file_path or not file_path.exists():
-        st.info("File belum tersedia.")
+        st.info("File belum tersedia. Gunakan file lokal yang diupload dari localhost/server.")
         return True
 
     ext = file_path.suffix.lower()
     if ext == ".pdf":
         with file_path.open("rb") as f:
             pdf_bytes = f.read()
-        st.download_button(
-            "Download PDF",
-            data=pdf_bytes,
-            file_name=file_path.name,
-            mime="application/pdf",
-            use_container_width=False,
+        b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+        st.markdown(
+            f"""
+            <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:8px;">
+                <iframe
+                    src="data:application/pdf;base64,{b64}"
+                    width="100%"
+                    height="900"
+                    style="border:none;border-radius:10px;"
+                ></iframe>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        st.info("File lokal tersedia untuk diunduh.")
+    elif ext in [".png", ".jpg", ".jpeg", ".webp"]:
+        st.image(str(file_path), use_container_width=True)
     else:
         with file_path.open("rb") as f:
             st.download_button("Download file", f.read(), file_name=file_path.name, use_container_width=False)
-        st.info("Preview inline saat ini tersedia melalui tautan OneDrive atau download file.")
+        st.info("Preview inline saat ini tersedia untuk PDF dan gambar.")
     return True
 
 
@@ -1102,15 +1091,10 @@ def render_table(df: pd.DataFrame) -> None:
                 st.markdown(f"<span class='deadline-alert'>⚠ {label} deadline</span>", unsafe_allow_html=True)
         with c2:
             st.write(row["kantor"] or "-")
-            surat_value = get_doc_value(row, "file_surat")
-            if doc_available(surat_value):
-                if is_url(surat_value):
-                    st.link_button("📩 Dispo", surat_value, use_container_width=True)
-                else:
-                    if st.button("📩 Dispo", key=f"surat_{row['id']}", use_container_width=True):
-                        open_preview(int(row["id"]), "surat")
-            else:
-                st.caption("Dispo: -")
+            surat = safe_path(row["file_surat"])
+            if surat and surat.exists():
+                if st.button("📩 Surat", key=f"surat_{row['id']}", use_container_width=True):
+                    open_preview(int(row["id"]), "surat")
         with c3:
             st.markdown(f"<div class='mini-text'>PIC 1: {row['pic1'] or '-'}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='mini-text'>PIC 2: {row['pic2'] or '-'}</div>", unsafe_allow_html=True)
@@ -1122,24 +1106,16 @@ def render_table(df: pd.DataFrame) -> None:
             st.progress(progress / 100)
             st.caption(f"{progress}%")
         with c6:
-            paparan_value = get_doc_value(row, "file_paparan")
-            narasi_value = get_doc_value(row, "file_narasi")
-
-            if doc_available(paparan_value):
-                if is_url(paparan_value):
-                    st.link_button("📊 Paparan", paparan_value, use_container_width=True)
-                else:
-                    if st.button("📊 Paparan", key=f"paparan_{row['id']}", use_container_width=True):
-                        open_preview(int(row["id"]), "paparan")
+            paparan = safe_path(row["file_paparan"])
+            narasi = safe_path(row["file_narasi"])
+            if paparan and paparan.exists():
+                if st.button("👁️ Paparan", key=f"paparan_{row['id']}", use_container_width=True):
+                    open_preview(int(row["id"]), "paparan")
             else:
                 st.caption("Paparan: -")
-
-            if doc_available(narasi_value):
-                if is_url(narasi_value):
-                    st.link_button("📝 Narasi", narasi_value, use_container_width=True)
-                else:
-                    if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
-                        open_preview(int(row["id"]), "narasi")
+            if narasi and narasi.exists():
+                if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
+                    open_preview(int(row["id"]), "narasi")
             else:
                 st.caption("Narasi: -")
         with c7:
