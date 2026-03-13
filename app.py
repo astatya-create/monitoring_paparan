@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import base64
 import sqlite3
+import shutil
 from io import BytesIO
 from contextlib import closing
 from datetime import datetime
@@ -156,7 +157,26 @@ def run_sql(query: str, params: tuple[Any, ...] = ()) -> None:
     with closing(get_conn()) as conn:
         conn.execute(query, params)
         conn.commit()
+    backup_database()
     get_df.clear()
+
+
+def backup_database() -> None:
+    try:
+        if DB_NAME.exists():
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_file = BACKUP_DIR / f"monitoring_{timestamp}.db"
+            shutil.copy2(DB_NAME, backup_file)
+
+            backups = sorted(
+                BACKUP_DIR.glob("monitoring_*.db"),
+                key=lambda x: x.stat().st_mtime,
+                reverse=True,
+            )
+            for old_file in backups[10:]:
+                old_file.unlink(missing_ok=True)
+    except Exception as e:
+        st.warning(f"Backup database gagal: {e}")
 
 
 def authenticate(username: str, password: str) -> str | None:
@@ -1204,6 +1224,15 @@ def render_dashboard() -> None:
             tambah_bahan_dialog()
         if st.button("Ganti Password", use_container_width=True):
             change_password_dialog()
+        if st.session_state.role == "admin" and DB_NAME.exists():
+            with DB_NAME.open("rb") as f:
+                st.download_button(
+                    "Download Backup DB",
+                    data=f.read(),
+                    file_name="monitoring_backup.db",
+                    mime="application/octet-stream",
+                    use_container_width=True,
+                )
         if st.button("Logout", use_container_width=True):
             logout()
 
@@ -1274,11 +1303,15 @@ def render_dashboard() -> None:
 
 def main() -> None:
     init_db()
+    backup_database()
+
     if "user" not in st.session_state:
         render_login()
         return
+
     if render_preview():
         return
+
     render_dashboard()
 
 

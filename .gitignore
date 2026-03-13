@@ -2,3 +2,6 @@ serviceAccountKey.json
 venv/
 __pycache__/
 *.db
+monitoring.db
+backup/
+.streamlit/secrets.toml
