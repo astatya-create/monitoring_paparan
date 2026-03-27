@@ -330,22 +330,19 @@ def inject_dashboard_css() -> None:
             background: linear-gradient(180deg, #2da8d8 0%, #1a7fb4 100%) !important;
             color: white !important; border: none !important; border-radius: 12px !important; font-weight: 800 !important;
         }
-        [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] .stTextInput {
-            margin-bottom: .15rem !important;
-        }
-        .header-card { background: #ffffff; border: 1px solid #dbe4ef; border-radius: 16px; padding: 18px 22px; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(15, 39, 71, 0.06);}
+        .header-card { background: #ffffff; border: 1px solid #dbe4ef; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; box-shadow: 0 2px 8px rgba(15, 39, 71, 0.04);}
         .header-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
         .header-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
         .header-title { color: #14213d; font-size: 30px; font-weight: 900; line-height: 1.08; margin: 0; text-transform: uppercase; }
         .header-subtitle { color: #1d5b84; font-size: 16px; margin-top: 4px; font-weight: 800; letter-spacing: .08em; }
         .header-user { text-align: right; color: #14213d; font-weight: 800; font-size: 16px; border-left: 1px solid #dbe4ef; padding-left: 22px; min-width: 200px; }
-        .kpi-card { background: white; border-radius: 18px; padding: 18px 20px; border: 1px solid #e5e7eb; box-shadow: 0 4px 18px rgba(15, 39, 71, 0.05); margin-bottom: 10px; min-height: 108px; }
+        .kpi-card { background: white; border-radius: 18px; padding: 16px 18px; border: 1px solid #e5e7eb; box-shadow: 0 4px 18px rgba(15, 39, 71, 0.05); margin-bottom: 8px; }
         .kpi-label { color: #7b8ca6; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
         .kpi-value { color: #0f172a; font-size: 30px; font-weight: 900; margin-top: 8px; }
         .section-title { color: #0f4d73; font-size: 18px; font-weight: 900; margin: 12px 0 8px; text-transform: uppercase; letter-spacing: .03em; }
-        .table-card { background: white; border: 1px solid #e5e7eb; border-radius: 18px; padding: 16px 16px; box-shadow: 0 4px 18px rgba(15, 39, 71, 0.05); margin-top: 18px; }
+        .table-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 10px 12px; box-shadow: 0 4px 18px rgba(15, 39, 71, 0.05); margin-top: 16px; }
         .badge { display: inline-block; padding: 5px 10px; border-radius: 999px; background: #0f4d73; color: #ffffff; font-size: 12px; font-weight: 800; }
-        .table-head { color: #64748b; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; padding-bottom: 4px; }
+        .table-head { color: #64748b; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
         .status-pill, .approval-pill { display: inline-block; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
         .status-notyet { background: #fee2e2; color: #b91c1c; }
         .status-progress { background: #fef3c7; color: #92400e; }
@@ -355,31 +352,16 @@ def inject_dashboard_css() -> None:
         .approval-rejected { background: #fee2e2; color: #b91c1c; }
         .deadline-alert { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 15px; font-weight: 900; margin-top: 6px; }
         .deadline-safe { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 15px; font-weight: 900; margin-top: 6px; }
-        .mini-text { font-size: 14px; color: #64748b; line-height: 1.35; margin: 3px 0; }
-        .meta-text { font-size: 15px; color: #475569; line-height: 1.4; margin: 4px 0; font-weight: 600; }
-        .pic-text { font-size: 15px; color: #334155; line-height: 1.35; margin: 3px 0; font-weight: 700; }
-        .row-title { margin-bottom: 4px; line-height: 1.25; color: #14213d; font-size: 18px; }
+        .mini-text { font-size: 12px; color: #64748b; line-height: 1.25; margin: 2px 0; }
+        .row-title { margin-bottom: 2px; line-height: 1.2; color: #14213d; }
         @media (max-width: 768px) {
-            .header-row { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .header-row { flex-direction: column; align-items: flex-start; }
             .header-user { border-left: none; padding-left: 0; min-width: auto; text-align: left; }
             .header-title { font-size: 22px; }
             .header-subtitle { font-size: 13px; }
             .kpi-value { font-size: 24px; }
-            .kpi-card { min-height: auto; padding: 16px; }
-            .table-card { padding: 12px 10px; border-radius: 16px; }
-            .table-head { font-size: 12px; }
-            .deadline-alert, .deadline-safe { font-size: 17px; padding: 8px 12px; }
-            .meta-text { font-size: 16px; }
-            .pic-text { font-size: 16px; }
-            .row-title { font-size: 17px; }
-            .mini-text { font-size: 13px; }
-            div[data-testid="stHorizontalBlock"] { flex-direction: column; gap: 8px; }
-            div[data-testid="stButton"] > button,
-            div[data-testid="stDownloadButton"] > button {
-                width: 100%;
-                min-height: 42px;
-                border-radius: 12px !important;
-            }
+            .deadline-alert, .deadline-safe { font-size: 16px; }
+            div[data-testid="stHorizontalBlock"] { flex-direction: column; }
         }
         </style>
     """, unsafe_allow_html=True)
@@ -697,21 +679,10 @@ def render_kpi(df: pd.DataFrame) -> None:
     on_progress = int((df["status"] == "On Progress").sum())
     not_started = int((df["status"] == "Not Yet Started").sum())
     approval_pending = int((df["approval_status"] == "Pending Approval").sum())
-    active_status_df = df[df["status"].isin(["Not Yet Started", "On Progress"])].copy()
-    all_pics = {
-        pic
-        for val in active_status_df["pic_list"].astype(str).tolist()
-        for pic in split_pic_list(val)
-    }
+    all_pics = {pic for val in df["pic_list"].astype(str).tolist() for pic in split_pic_list(val)}
     total_pic = len(all_pics)
-    cards = [
-        ("TOTAL PAPARAN", total, "#17355c"),
-        ("BELUM MULAI", not_started, "#ef4444"),
-        ("DALAM PROSES", on_progress, "#f59e0b"),
-        ("SELESAI", done, "#22c55e"),
-        ("MENUNGGU APPROVAL", approval_pending, "#0ea5e9"),
-        ("PIC AKTIF", total_pic, "#06b6d4"),
-    ]
+    cards = [("TOTAL PAPARAN", total, "#17355c"), ("DALAM PROSES", on_progress, "#f59e0b"), ("SELESAI", done, "#22c55e"),
+             ("PIC AKTIF", total_pic, "#06b6d4"), ("BELUM MULAI", not_started, "#ef4444"), ("MENUNGGU APPROVAL", approval_pending, "#0ea5e9")]
     cols = st.columns(len(cards))
     for col, (label, value, color) in zip(cols, cards):
         with col:
@@ -771,10 +742,10 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
             st.info("Belum ada data bulanan.")
     with c5:
         if df_trend["tgl_disposisi"].notna().any():
-            df_trend["triwulan"] = df_trend["tgl_disposisi"].dt.quarter.map(lambda q: f"TW{int(q)}")
+            df_trend["triwulan_chart"] = df_trend["tgl_disposisi"].dt.quarter.map(lambda q: f"TW{int(q)}")
             tri_order = ["TW1", "TW2", "TW3", "TW4"]
-            triwulan = df_trend.dropna(subset=["triwulan"]).groupby("triwulan").size().reindex(tri_order, fill_value=0).reset_index(name="Jumlah")
-            fig = px.bar(triwulan, x="triwulan", y="Jumlah", text="Jumlah", color="triwulan", color_discrete_map={"TW1":"#38bdf8","TW2":"#22c55e","TW3":"#f59e0b","TW4":"#ef4444"})
+            triwulan = df_trend.dropna(subset=["triwulan_chart"]).groupby("triwulan_chart").size().reindex(tri_order, fill_value=0).reset_index(name="Jumlah")
+            fig = px.bar(triwulan, x="triwulan_chart", y="Jumlah", text="Jumlah", color="triwulan_chart", color_discrete_map={"TW1":"#38bdf8","TW2":"#22c55e","TW3":"#f59e0b","TW4":"#ef4444"})
             fig.update_traces(textposition="outside"); fig.update_layout(showlegend=False, yaxis=dict(dtick=1), margin=dict(l=10, r=10, t=10, b=10), height=360)
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -782,6 +753,7 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
 
 
 def render_table(df: pd.DataFrame) -> None:
+    st.markdown('<div class="table-card">', unsafe_allow_html=True)
     top1, top2 = st.columns([5, 1])
     with top1:
         st.markdown('<div class="section-title">Daftar Bahan Paparan</div>', unsafe_allow_html=True)
@@ -811,11 +783,13 @@ def render_table(df: pd.DataFrame) -> None:
             deadline_days = row.get("days_to_deadline", None)
             if pd.notna(deadline_days):
                 deadline_days = int(deadline_days)
-                if 0 <= deadline_days <= 3:
+                if deadline_days < 0:
+                    st.markdown(f"<span class='deadline-alert'>⚠ Lewat {-deadline_days} hari</span>", unsafe_allow_html=True)
+                elif 0 <= deadline_days <= 3:
                     label = "Hari ini" if deadline_days == 0 else f"H-{deadline_days}"
                     st.markdown(f"<span class='deadline-alert'>⚠ {label}</span>", unsafe_allow_html=True)
                 else:
-                    st.markdown("<div class='pic-text'> </div>", unsafe_allow_html=True)
+                    st.markdown(f"<span class='deadline-safe'>Deadline: {row['deadline'].date()}</span>", unsafe_allow_html=True)
         with c2:
             st.write(row["kantor"] or "-")
             surat_value = str(row["file_surat"] or "").strip()
@@ -828,11 +802,11 @@ def render_table(df: pd.DataFrame) -> None:
             pics = split_pic_list(str(row["pic_list"]))
             if pics:
                 for pic in pics[:4]:
-                    st.markdown(f"<div class='pic-text'>• {pic}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='mini-text'>• {pic}</div>", unsafe_allow_html=True)
                 if len(pics) > 4:
-                    st.markdown(f"<div class='pic-text'>+{len(pics)-4} PIC lain</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='mini-text'>+{len(pics)-4} PIC lain</div>", unsafe_allow_html=True)
             else:
-                st.markdown("<div class='pic-text'>-</div>", unsafe_allow_html=True)
+                st.markdown("<div class='mini-text'>-</div>", unsafe_allow_html=True)
         with c4:
             st.markdown(f"<span class='status-pill {pill_class}'>{row['status']}</span>", unsafe_allow_html=True)
             if row["keterangan"]:
@@ -859,21 +833,20 @@ def render_table(df: pd.DataFrame) -> None:
         with c8:
             can_edit = st.session_state.role in {"admin", "atasan"} or user_is_in_pic_list(st.session_state.user, str(row["pic_list"]))
             can_delete = st.session_state.role in {"admin", "atasan"}
-            if st.button("✏️ Edit", key=f"edit_{row['id']}", disabled=not can_edit, use_container_width=True):
-                edit_dialog(int(row["id"]))
-            if st.button("✅ Approval", key=f"approve_{row['id']}", disabled=st.session_state.role not in {"admin", "atasan"}, use_container_width=True):
-                approval_dialog(int(row["id"]))
+            a1, a2 = st.columns(2)
+            with a1:
+                if st.button("✏️", key=f"edit_{row['id']}", disabled=not can_edit):
+                    edit_dialog(int(row["id"]))
+            with a2:
+                if st.button("✅", key=f"approve_{row['id']}", disabled=st.session_state.role not in {"admin", "atasan"}):
+                    approval_dialog(int(row["id"]))
             if can_delete:
                 if st.button("🗑️ Hapus", key=f"del_{row['id']}", use_container_width=True):
                     bahan_df = load_bahan().copy()
                     bahan_df = bahan_df[bahan_df["id"] != int(row["id"])]
                     save_bahan(bahan_df)
                     append_audit(int(row["id"]), st.session_state.user, "delete bahan")
-                    st.success("Data berhasil dihapus.")
-                    st.rerun()
-            else:
-                st.button("🗑️ Hapus", key=f"del_disabled_{row['id']}", disabled=True, use_container_width=True)
-        st.markdown("<div style='margin:6px 0 2px 0;'></div>", unsafe_allow_html=True)
+                    st.success("Data berhasil dihapus."); st.rerun()
         st.divider()
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -895,25 +868,19 @@ def render_dashboard() -> None:
     if df.empty:
         st.info("Belum ada data bahan."); return
     with st.sidebar:
-        st.markdown("---"); st.subheader("Filter")
+        st.markdown("---"); st.subheader("Filter Data")
         tahun_list = sorted([int(x) for x in df["tahun"].dropna().unique().tolist()]) if df["tahun"].notna().any() else [datetime.now().year]
-        fc1, fc2 = st.columns(2)
-        with fc1:
-            tahun_pilih = st.selectbox("Tahun", tahun_list, index=max(len(tahun_list)-1, 0))
-        with fc2:
-            triwulan_filter = st.selectbox("TW", ["Semua", "I", "II", "III", "IV"])
+        tahun_pilih = st.selectbox("Tahun", tahun_list, index=max(len(tahun_list)-1, 0))
+        triwulan_filter = st.selectbox("Triwulan", ["Semua", "I", "II", "III", "IV"])
         scope = st.selectbox("Tampilan", ["Tugas Saya", "Semua Bahan"] if st.session_state.role == "pic" else ["Semua Bahan"], index=0)
-        keyword = st.text_input("Cari", placeholder="Nama bahan / instruksi")
+        keyword = st.text_input("Search Keyword", placeholder="Nama bahan / instruksi")
         all_pics = sorted({pic for val in df["pic_list"].astype(str).tolist() for pic in split_pic_list(val)})
+        pic_filter = st.selectbox("PIC", ["Semua"] + all_pics)
         kantor_list = sorted(df["kantor"].dropna().astype(str).unique().tolist())
+        kantor_filter = st.selectbox("Kantor", ["Semua"] + kantor_list)
         jenis_list = sorted(df["jenis_bahan"].dropna().astype(str).unique().tolist())
-        fc3, fc4 = st.columns(2)
-        with fc3:
-            pic_filter = st.selectbox("PIC", ["Semua"] + all_pics)
-            kantor_filter = st.selectbox("Kantor", ["Semua"] + kantor_list)
-        with fc4:
-            jenis_filter = st.selectbox("Jenis", ["Semua"] + jenis_list)
-            approval_filter = st.selectbox("Approval", ["Semua"] + APPROVAL_OPTIONS)
+        jenis_filter = st.selectbox("Jenis Bahan", ["Semua"] + jenis_list)
+        approval_filter = st.selectbox("Approval", ["Semua"] + APPROVAL_OPTIONS)
     filtered = df.copy()
     if st.session_state.role == "pic" and scope == "Tugas Saya":
         filtered = filtered[filtered["pic_list"].apply(lambda x: user_is_in_pic_list(st.session_state.user, str(x)))]

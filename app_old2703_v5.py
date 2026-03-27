@@ -45,6 +45,13 @@ def normalize_link(value: str | None) -> str:
     return str(value).strip() if value else ""
 
 
+def normalize_kantor(value: str | None) -> str:
+    val = str(value or "").strip()
+    if val.lower() == "pusat":
+        return "Gatsu"
+    return val
+
+
 def is_url(value: str | None) -> bool:
     return bool(value) and str(value).strip().lower().startswith(("http://", "https://"))
 
@@ -216,6 +223,7 @@ def load_bahan() -> pd.DataFrame:
     df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0).astype(int)
     df["tgl_disposisi"] = pd.to_datetime(df["tgl_disposisi"], errors="coerce")
     df["deadline"] = pd.to_datetime(df["deadline"], errors="coerce")
+    df["kantor"] = df["kantor"].apply(normalize_kantor)
     df["tahun"] = df["tgl_disposisi"].dt.year
     tri_map = {1: "I", 2: "I", 3: "I", 4: "II", 5: "II", 6: "II", 7: "III", 8: "III", 9: "III", 10: "IV", 11: "IV", 12: "IV"}
     df["triwulan"] = df["tgl_disposisi"].dt.month.map(tri_map)
@@ -343,8 +351,8 @@ def inject_dashboard_css() -> None:
         .kpi-label { color: #7b8ca6; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
         .kpi-value { color: #0f172a; font-size: 30px; font-weight: 900; margin-top: 8px; }
         .section-title { color: #0f4d73; font-size: 18px; font-weight: 900; margin: 12px 0 8px; text-transform: uppercase; letter-spacing: .03em; }
-        .table-card { background: white; border: 1px solid #e5e7eb; border-radius: 18px; padding: 16px 16px; box-shadow: 0 4px 18px rgba(15, 39, 71, 0.05); margin-top: 18px; }
-        .badge { display: inline-block; padding: 5px 10px; border-radius: 999px; background: #0f4d73; color: #ffffff; font-size: 12px; font-weight: 800; }
+        .table-card { background: white; border: 1px solid #e5e7eb; border-radius: 20px; padding: 18px 18px; box-shadow: 0 6px 20px rgba(15, 39, 71, 0.06); margin-top: 18px; }
+        .badge { display: inline-block; padding: 6px 12px; border-radius: 999px; background: #0f4d73; color: #ffffff; font-size: 12px; font-weight: 800; }
         .table-head { color: #64748b; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; padding-bottom: 4px; }
         .status-pill, .approval-pill { display: inline-block; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
         .status-notyet { background: #fee2e2; color: #b91c1c; }
@@ -381,6 +389,28 @@ def inject_dashboard_css() -> None:
                 border-radius: 12px !important;
             }
         }
+        
+        .table-row {
+            background: #ffffff;
+            border: 1px solid #eef2f7;
+            border-radius: 16px;
+            padding: 14px 12px 10px 12px;
+            margin: 10px 0;
+        }
+        .action-btn-note {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+        div[data-testid="stButton"] > button {
+            border-radius: 10px !important;
+        }
+        .output-stack, .action-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         </style>
     """, unsafe_allow_html=True)
 
@@ -486,7 +516,7 @@ def tambah_bahan_dialog() -> None:
         next_id = 1 if df_bahan.empty else int(df_bahan["id"].max()) + 1
         new_row = pd.DataFrame([{
             "id": next_id, "tgl_disposisi": str(tgl_disposisi), "nama_bahan": nama.strip(), "pic_list": join_pic_list(pic_selected),
-            "kantor": kantor, "jenis_bahan": jenis, "instruksi": instruksi, "deadline": str(deadline),
+            "kantor": normalize_kantor(kantor), "jenis_bahan": jenis, "instruksi": instruksi, "deadline": str(deadline),
             "status": "Not Yet Started", "progress": 0, "keterangan": "", "file_surat": normalize_link(file_surat_link),
             "file_paparan": normalize_link(file_paparan_link), "file_narasi": normalize_link(file_narasi_link),
             "approval_status": "Pending Approval", "approved_by": "", "approved_at": "",
@@ -682,7 +712,7 @@ def render_header() -> None:
                     {logo_html}
                     <div>
                         <div class="header-title">Dashboard Monitoring Disposisi Penyusunan Bahan Pimpinan</div>
-                        <div class="header-subtitle">PDSIA Gatsu &amp; Tulodong</div>
+                        <div class="header-subtitle">PDSIA Pusat &amp; Tulodong</div>
                     </div>
                 </div>
                 <div class="header-user">{role_name}<br>{str(st.session_state.user).upper()}</div>
@@ -697,12 +727,7 @@ def render_kpi(df: pd.DataFrame) -> None:
     on_progress = int((df["status"] == "On Progress").sum())
     not_started = int((df["status"] == "Not Yet Started").sum())
     approval_pending = int((df["approval_status"] == "Pending Approval").sum())
-    active_status_df = df[df["status"].isin(["Not Yet Started", "On Progress"])].copy()
-    all_pics = {
-        pic
-        for val in active_status_df["pic_list"].astype(str).tolist()
-        for pic in split_pic_list(val)
-    }
+    all_pics = {pic for val in df["pic_list"].astype(str).tolist() for pic in split_pic_list(val)}
     total_pic = len(all_pics)
     cards = [
         ("TOTAL PAPARAN", total, "#17355c"),
@@ -751,13 +776,14 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
         fig = px.bar(kantor, x="Kantor", y="Jumlah", text="Jumlah", color="Kantor")
         fig.update_traces(textposition="outside"); fig.update_layout(showlegend=False, yaxis=dict(dtick=1), margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig, use_container_width=True)
-    st.markdown(f'<div class="section-title">Tren Bulanan dan Triwulanan ({tahun_pilih})</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">Tren Bulanan dan Triwulanan berdasarkan Deadline ({tahun_pilih})</div>', unsafe_allow_html=True)
     c4, c5 = st.columns(2)
-    df_trend = df.copy(); df_trend["tgl_disposisi"] = pd.to_datetime(df_trend["tgl_disposisi"], errors="coerce")
+    df_trend = df.copy()
+    df_trend["deadline"] = pd.to_datetime(df_trend["deadline"], errors="coerce")
     with c4:
         month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
-        if df_trend["tgl_disposisi"].notna().any():
-            df_trend["bulan_num"] = df_trend["tgl_disposisi"].dt.month
+        if df_trend["deadline"].notna().any():
+            df_trend["bulan_num"] = df_trend["deadline"].dt.month
             bulanan = df_trend.dropna(subset=["bulan_num"]).groupby(["bulan_num", "status"]).size().reset_index(name="Jumlah")
             all_months = pd.DataFrame({"bulan_num": list(range(1, 13))})
             total_bulan = bulanan.groupby("bulan_num", as_index=False)["Jumlah"].sum() if not bulanan.empty else pd.DataFrame({"bulan_num":[], "Jumlah":[]})
@@ -770,11 +796,11 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
         else:
             st.info("Belum ada data bulanan.")
     with c5:
-        if df_trend["tgl_disposisi"].notna().any():
-            df_trend["triwulan"] = df_trend["tgl_disposisi"].dt.quarter.map(lambda q: f"TW{int(q)}")
+        if df_trend["deadline"].notna().any():
+            df_trend["triwulan_chart"] = df_trend["deadline"].dt.quarter.map(lambda q: f"TW{int(q)}")
             tri_order = ["TW1", "TW2", "TW3", "TW4"]
-            triwulan = df_trend.dropna(subset=["triwulan"]).groupby("triwulan").size().reindex(tri_order, fill_value=0).reset_index(name="Jumlah")
-            fig = px.bar(triwulan, x="triwulan", y="Jumlah", text="Jumlah", color="triwulan", color_discrete_map={"TW1":"#38bdf8","TW2":"#22c55e","TW3":"#f59e0b","TW4":"#ef4444"})
+            triwulan = df_trend.dropna(subset=["triwulan_chart"]).groupby("triwulan_chart").size().reindex(tri_order, fill_value=0).reset_index(name="Jumlah")
+            fig = px.bar(triwulan, x="triwulan_chart", y="Jumlah", text="Jumlah", color="triwulan_chart", color_discrete_map={"TW1":"#38bdf8","TW2":"#22c55e","TW3":"#f59e0b","TW4":"#ef4444"})
             fig.update_traces(textposition="outside"); fig.update_layout(showlegend=False, yaxis=dict(dtick=1), margin=dict(l=10, r=10, t=10, b=10), height=360)
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -782,21 +808,31 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
 
 
 def render_table(df: pd.DataFrame) -> None:
+    st.markdown('<div class="table-card">', unsafe_allow_html=True)
     top1, top2 = st.columns([5, 1])
     with top1:
         st.markdown('<div class="section-title">Daftar Bahan Paparan</div>', unsafe_allow_html=True)
     with top2:
         st.markdown(f'<div style="text-align:right;"><span class="badge">{len(df)} Data</span></div>', unsafe_allow_html=True)
-    header_cols = st.columns([0.35, 2.6, 1.05, 1.35, 1.1, 1.0, 1.15, 1.05, 1.2])
+
+    header_cols = st.columns([0.4, 3.0, 1.1, 1.45, 1.15, 1.0, 1.2, 1.25, 1.25])
     for col, title in zip(header_cols, ["No", "Judul", "Tim Kerja", "PIC", "Status", "Progress", "Approval", "Output", "Aksi"]):
         col.markdown(f"<div class='table-head'>{title}</div>", unsafe_allow_html=True)
     st.divider()
+
     for no, (_, row) in enumerate(df.iterrows(), start=1):
         pill_class = {"Done": "status-done", "On Progress": "status-progress"}.get(row["status"], "status-notyet")
         approval_class = {"Approved": "approval-approved", "Rejected": "approval-rejected"}.get(str(row["approval_status"]), "approval-pending")
         progress = max(0, min(100, int(row["progress"] or 0)))
-        c0, c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.35, 2.6, 1.05, 1.35, 1.1, 1.0, 1.15, 1.05, 1.2])
+        surat_value = str(row["file_surat"] or "").strip()
+        paparan_value = str(row["file_paparan"] or "").strip()
+        narasi_value = str(row["file_narasi"] or "").strip()
+
+        st.markdown("<div class='table-row'>", unsafe_allow_html=True)
+        c0, c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.4, 3.0, 1.1, 1.45, 1.15, 1.0, 1.2, 1.25, 1.25])
+
         c0.write(no)
+
         with c1:
             st.markdown(f"<div class='row-title'><strong>{row['nama_bahan']}</strong></div>", unsafe_allow_html=True)
             if st.session_state.get("role") == "pic" and user_is_in_pic_list(st.session_state.get("user", ""), str(row["pic_list"])):
@@ -804,26 +840,23 @@ def render_table(df: pd.DataFrame) -> None:
             info = []
             if row["jenis_bahan"]:
                 info.append(str(row["jenis_bahan"]))
-            if pd.notna(row["deadline"]):
-                info.append(f"Deadline: {row['deadline'].date()}")
             if info:
-                st.markdown(f"<div class='mini-text'>{' • '.join(info)}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='meta-text'>{' • '.join(info)}</div>", unsafe_allow_html=True)
             deadline_days = row.get("days_to_deadline", None)
             if pd.notna(deadline_days):
                 deadline_days = int(deadline_days)
                 if 0 <= deadline_days <= 3:
-                    label = "Hari ini" if deadline_days == 0 else f"H-{deadline_days}"
+                    label = "H-0 / Hari ini" if deadline_days == 0 else f"H-{deadline_days}"
                     st.markdown(f"<span class='deadline-alert'>⚠ {label}</span>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div class='pic-text'> </div>", unsafe_allow_html=True)
+
         with c2:
             st.write(row["kantor"] or "-")
-            surat_value = str(row["file_surat"] or "").strip()
             if is_url(surat_value):
                 if st.button("📩 Dispo", key=f"surat_{row['id']}", use_container_width=True):
                     show_link_dialog("Link Disposisi", surat_value)
             else:
-                st.caption("Dispo: -")
+                st.markdown("<div class='action-btn-note'>Tidak ada link</div>", unsafe_allow_html=True)
+
         with c3:
             pics = split_pic_list(str(row["pic_list"]))
             if pics:
@@ -833,29 +866,33 @@ def render_table(df: pd.DataFrame) -> None:
                     st.markdown(f"<div class='pic-text'>+{len(pics)-4} PIC lain</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div class='pic-text'>-</div>", unsafe_allow_html=True)
+
         with c4:
             st.markdown(f"<span class='status-pill {pill_class}'>{row['status']}</span>", unsafe_allow_html=True)
             if row["keterangan"]:
                 st.markdown(f"<div class='mini-text'>{str(row['keterangan'])}</div>", unsafe_allow_html=True)
+
         with c5:
-            st.progress(progress / 100); st.caption(f"{progress}%")
+            st.progress(progress / 100)
+            st.caption(f"{progress}%")
+
         with c6:
             st.markdown(f"<span class='approval-pill {approval_class}'>{row['approval_status']}</span>", unsafe_allow_html=True)
             if row["approved_by"]:
                 st.markdown(f"<div class='mini-text'>Oleh: {row['approved_by']}</div>", unsafe_allow_html=True)
+
         with c7:
-            paparan_value = str(row["file_paparan"] or "").strip()
-            narasi_value = str(row["file_narasi"] or "").strip()
             if is_url(paparan_value):
                 if st.button("📊 Paparan", key=f"paparan_{row['id']}", use_container_width=True):
                     show_link_dialog("Link Paparan", paparan_value)
             else:
-                st.caption("Paparan: -")
+                st.button("📊 Paparan", key=f"paparan_disabled_{row['id']}", disabled=True, use_container_width=True)
             if is_url(narasi_value):
                 if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
                     show_link_dialog("Link Narasi", narasi_value)
             else:
-                st.caption("Narasi: -")
+                st.button("📝 Narasi", key=f"narasi_disabled_{row['id']}", disabled=True, use_container_width=True)
+
         with c8:
             can_edit = st.session_state.role in {"admin", "atasan"} or user_is_in_pic_list(st.session_state.user, str(row["pic_list"]))
             can_delete = st.session_state.role in {"admin", "atasan"}
@@ -873,9 +910,45 @@ def render_table(df: pd.DataFrame) -> None:
                     st.rerun()
             else:
                 st.button("🗑️ Hapus", key=f"del_disabled_{row['id']}", disabled=True, use_container_width=True)
-        st.markdown("<div style='margin:6px 0 2px 0;'></div>", unsafe_allow_html=True)
-        st.divider()
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+
+def render_role_summary(df: pd.DataFrame) -> None:
+    role = st.session_state.role
+    user = st.session_state.user
+
+    if role == "pic":
+        mine = df[df["pic_list"].apply(lambda x: user_is_in_pic_list(user, str(x)))].copy()
+        st.markdown('<div class="section-title">Ringkasan PIC</div>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Tugas Saya", len(mine))
+        c2.metric("Belum Mulai", int((mine["status"] == "Not Yet Started").sum()) if not mine.empty else 0)
+        c3.metric("Dalam Proses", int((mine["status"] == "On Progress").sum()) if not mine.empty else 0)
+        c4.metric("Perlu Approval", int((mine["approval_status"] == "Pending Approval").sum()) if not mine.empty else 0)
+        return
+
+    if role == "atasan":
+        pending = df[df["approval_status"] == "Pending Approval"].copy()
+        overdue = df[(pd.notna(df["days_to_deadline"])) & (df["days_to_deadline"] < 0)].copy()
+        done = df[df["status"] == "Done"].copy()
+        st.markdown('<div class="section-title">Ringkasan Atasan</div>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total Bahan", len(df))
+        c2.metric("Pending Approval", len(pending))
+        c3.metric("Selesai", len(done))
+        c4.metric("Lewat Deadline", len(overdue))
+        return
+
+    st.markdown('<div class="section-title">Ringkasan Admin</div>', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Bahan", len(df))
+    c2.metric("User Aktif", int((load_users()["active"].astype(str) != "0").sum()) if not load_users().empty else 0)
+    c3.metric("Pending Approval", int((df["approval_status"] == "Pending Approval").sum()) if not df.empty else 0)
+    c4.metric("Selesai", int((df["status"] == "Done").sum()) if not df.empty else 0)
 
 
 def render_dashboard() -> None:
@@ -905,7 +978,7 @@ def render_dashboard() -> None:
         scope = st.selectbox("Tampilan", ["Tugas Saya", "Semua Bahan"] if st.session_state.role == "pic" else ["Semua Bahan"], index=0)
         keyword = st.text_input("Cari", placeholder="Nama bahan / instruksi")
         all_pics = sorted({pic for val in df["pic_list"].astype(str).tolist() for pic in split_pic_list(val)})
-        kantor_list = sorted(df["kantor"].dropna().astype(str).unique().tolist())
+        kantor_list = sorted(pd.Series(df["kantor"].astype(str).apply(normalize_kantor)).dropna().unique().tolist())
         jenis_list = sorted(df["jenis_bahan"].dropna().astype(str).unique().tolist())
         fc3, fc4 = st.columns(2)
         with fc3:
