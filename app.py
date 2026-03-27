@@ -13,25 +13,11 @@ from google.oauth2.service_account import Credentials
 from gspread.exceptions import APIError
 import time
 
-st.markdown("""
-<style>
-/* HIDE HEADER STREAMLIT */
-header {visibility: hidden;}
-
-/* HIDE MENU (tiga titik kanan atas) */
-#MainMenu {visibility: hidden;}
-
-/* HIDE FOOTER */
-footer {visibility: hidden;}
-
-/* OPTIONAL: remove top padding */
-.block-container {
-    padding-top: 1rem !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.set_page_config(page_title="Monitoring Disposisi Bahan Pimpinan", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="Monitoring Disposisi Bahan Pimpinan",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 SEED_USERS_FILE = BASE_DIR / "seed_users.py"
@@ -61,6 +47,13 @@ def file_to_base64(file_path: Path) -> str:
 
 def normalize_link(value: str | None) -> str:
     return str(value).strip() if value else ""
+
+
+def normalize_kantor(value: str | None) -> str:
+    val = str(value or "").strip()
+    if val.lower() == "pusat":
+        return "Gatsu"
+    return val
 
 
 def is_url(value: str | None) -> bool:
@@ -234,6 +227,7 @@ def load_bahan() -> pd.DataFrame:
     df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0).astype(int)
     df["tgl_disposisi"] = pd.to_datetime(df["tgl_disposisi"], errors="coerce")
     df["deadline"] = pd.to_datetime(df["deadline"], errors="coerce")
+    df["kantor"] = df["kantor"].apply(normalize_kantor)
     df["tahun"] = df["tgl_disposisi"].dt.year
     tri_map = {1: "I", 2: "I", 3: "I", 4: "II", 5: "II", 6: "II", 7: "III", 8: "III", 9: "III", 10: "IV", 11: "IV", 12: "IV"}
     df["triwulan"] = df["tgl_disposisi"].dt.month.map(tri_map)
@@ -361,8 +355,8 @@ def inject_dashboard_css() -> None:
         .kpi-label { color: #7b8ca6; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
         .kpi-value { color: #0f172a; font-size: 30px; font-weight: 900; margin-top: 8px; }
         .section-title { color: #0f4d73; font-size: 18px; font-weight: 900; margin: 12px 0 8px; text-transform: uppercase; letter-spacing: .03em; }
-        .table-card { background: white; border: 1px solid #e5e7eb; border-radius: 18px; padding: 16px 16px; box-shadow: 0 4px 18px rgba(15, 39, 71, 0.05); margin-top: 18px; }
-        .badge { display: inline-block; padding: 5px 10px; border-radius: 999px; background: #0f4d73; color: #ffffff; font-size: 12px; font-weight: 800; }
+        .table-card { background: white; border: 1px solid #e5e7eb; border-radius: 20px; padding: 18px 18px; box-shadow: 0 6px 20px rgba(15, 39, 71, 0.06); margin-top: 18px; }
+        .badge { display: inline-block; padding: 6px 12px; border-radius: 999px; background: #0f4d73; color: #ffffff; font-size: 12px; font-weight: 800; }
         .table-head { color: #64748b; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; padding-bottom: 4px; }
         .status-pill, .approval-pill { display: inline-block; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
         .status-notyet { background: #fee2e2; color: #b91c1c; }
@@ -399,6 +393,28 @@ def inject_dashboard_css() -> None:
                 border-radius: 12px !important;
             }
         }
+        
+        .table-row {
+            background: #ffffff;
+            border: 1px solid #eef2f7;
+            border-radius: 16px;
+            padding: 14px 12px 10px 12px;
+            margin: 10px 0;
+        }
+        .action-btn-note {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+        div[data-testid="stButton"] > button {
+            border-radius: 10px !important;
+        }
+        .output-stack, .action-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         </style>
     """, unsafe_allow_html=True)
 
@@ -504,7 +520,7 @@ def tambah_bahan_dialog() -> None:
         next_id = 1 if df_bahan.empty else int(df_bahan["id"].max()) + 1
         new_row = pd.DataFrame([{
             "id": next_id, "tgl_disposisi": str(tgl_disposisi), "nama_bahan": nama.strip(), "pic_list": join_pic_list(pic_selected),
-            "kantor": kantor, "jenis_bahan": jenis, "instruksi": instruksi, "deadline": str(deadline),
+            "kantor": normalize_kantor(kantor), "jenis_bahan": jenis, "instruksi": instruksi, "deadline": str(deadline),
             "status": "Not Yet Started", "progress": 0, "keterangan": "", "file_surat": normalize_link(file_surat_link),
             "file_paparan": normalize_link(file_paparan_link), "file_narasi": normalize_link(file_narasi_link),
             "approval_status": "Pending Approval", "approved_by": "", "approved_at": "",
@@ -669,40 +685,6 @@ def render_user_admin() -> None:
                 save_users(users_df)
                 st.sidebar.success("User berhasil dihapus."); st.rerun()
 
-
-def sort_bahan_df(df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty:
-        return df
-
-    sorted_df = df.copy()
-
-    # Status ranking (Done paling bawah)
-    status_rank_map = {
-        "Not Yet Started": 0,
-        "On Progress": 1,
-        "Done": 2,
-    }
-
-    sorted_df["status_rank"] = sorted_df["status"].map(status_rank_map).fillna(9)
-
-    # Handle deadline kosong (taruh paling bawah)
-    sorted_df["deadline_missing"] = sorted_df["deadline"].isna().astype(int)
-
-    # Convert ke datetime untuk aman
-    sorted_df["deadline_sort"] = pd.to_datetime(sorted_df["deadline"], errors="coerce")
-
-    # Sorting utama
-    sorted_df = sorted_df.sort_values(
-        by=[
-            "status_rank",        # Done otomatis di bawah
-            "deadline_missing",   # yang tidak punya deadline paling bawah
-            "deadline_sort",      # deadline terdekat dulu
-            "id"
-        ],
-        ascending=[True, True, True, True],
-        na_position="last",
-    )
-
 def sort_bahan_df(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
@@ -738,7 +720,6 @@ def sort_bahan_df(df: pd.DataFrame) -> pd.DataFrame:
 
     return sorted_df.drop(columns=["status_rank", "deadline_missing", "deadline_sort"], errors="ignore")
 
-
 def render_header() -> None:
     logo_html = f'<img src="data:image/png;base64,{file_to_base64(LOGO_PATH)}" width="108">' if LOGO_PATH.exists() else ""
     role_name = "Administrator" if str(st.session_state.role).lower() == "admin" else str(st.session_state.role).title()
@@ -764,6 +745,7 @@ def render_kpi(df: pd.DataFrame) -> None:
     on_progress = int((df["status"] == "On Progress").sum())
     not_started = int((df["status"] == "Not Yet Started").sum())
     approval_pending = int((df["approval_status"] == "Pending Approval").sum())
+
     active_status_df = df[df["status"].isin(["Not Yet Started", "On Progress"])].copy()
     all_pics = {
         pic
@@ -771,6 +753,7 @@ def render_kpi(df: pd.DataFrame) -> None:
         for pic in split_pic_list(val)
     }
     total_pic = len(all_pics)
+
     cards = [
         ("TOTAL PAPARAN", total, "#17355c"),
         ("BELUM MULAI", not_started, "#ef4444"),
@@ -779,11 +762,19 @@ def render_kpi(df: pd.DataFrame) -> None:
         ("MENUNGGU APPROVAL", approval_pending, "#0ea5e9"),
         ("PIC AKTIF", total_pic, "#06b6d4"),
     ]
+
     cols = st.columns(len(cards))
     for col, (label, value, color) in zip(cols, cards):
         with col:
-            st.markdown(f"""<div class="kpi-card" style="border-left: 6px solid {color};"><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div></div>""", unsafe_allow_html=True)
-
+            st.markdown(
+                f"""
+                <div class="kpi-card" style="border-left: 6px solid {color};">
+                    <div class="kpi-label">{label}</div>
+                    <div class="kpi-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
     col1, col2, col3 = st.columns(3)
@@ -809,7 +800,7 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
             beban_long = beban.melt(id_vars=["PIC", "Total"], value_vars=["Not_Yet", "In_Progress", "Done"], var_name="Status", value_name="Jumlah")
             beban_long["Status"] = beban_long["Status"].map({"Not_Yet": "Not Yet Started", "In_Progress": "On Progress", "Done": "Done"})
             fig = px.bar(beban_long, y="PIC", x="Jumlah", color="Status", color_discrete_map={"Not Yet Started": "#ef4444", "On Progress": "#f59e0b", "Done": "#22c55e"}, orientation="h", barmode="stack")
-            fig.update_layout(height=420, margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
+            fig.update_layout(height=420, xaxis=dict(dtick=1), margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
             st.plotly_chart(fig, use_container_width=True)
     with col3:
         st.markdown(f'<div class="section-title">Distribusi Bahan per Tim Kerja ({tahun_pilih})</div>', unsafe_allow_html=True)
@@ -818,13 +809,14 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
         fig = px.bar(kantor, x="Kantor", y="Jumlah", text="Jumlah", color="Kantor")
         fig.update_traces(textposition="outside"); fig.update_layout(showlegend=False, yaxis=dict(dtick=1), margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig, use_container_width=True)
-    st.markdown(f'<div class="section-title">Tren Bulanan dan Triwulanan ({tahun_pilih})</div>', unsafe_allow_html=True)
     c4, c5 = st.columns(2)
-    df_trend = df.copy(); df_trend["tgl_disposisi"] = pd.to_datetime(df_trend["tgl_disposisi"], errors="coerce")
+    df_trend = df.copy()
+    df_trend["deadline"] = pd.to_datetime(df_trend["deadline"], errors="coerce")
     with c4:
+        st.markdown(f'<div class="section-title">Tren Bulanan ({tahun_pilih})</div>', unsafe_allow_html=True)
         month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
-        if df_trend["tgl_disposisi"].notna().any():
-            df_trend["bulan_num"] = df_trend["tgl_disposisi"].dt.month
+        if df_trend["deadline"].notna().any():
+            df_trend["bulan_num"] = df_trend["deadline"].dt.month
             bulanan = df_trend.dropna(subset=["bulan_num"]).groupby(["bulan_num", "status"]).size().reset_index(name="Jumlah")
             all_months = pd.DataFrame({"bulan_num": list(range(1, 13))})
             total_bulan = bulanan.groupby("bulan_num", as_index=False)["Jumlah"].sum() if not bulanan.empty else pd.DataFrame({"bulan_num":[], "Jumlah":[]})
@@ -837,8 +829,9 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
         else:
             st.info("Belum ada data bulanan.")
     with c5:
-        if df_trend["tgl_disposisi"].notna().any():
-            df_trend["triwulan"] = df_trend["tgl_disposisi"].dt.quarter.map(lambda q: f"TW{int(q)}")
+        st.markdown(f'<div class="section-title">Tren Triwulanan ({tahun_pilih})</div>', unsafe_allow_html=True)
+        if df_trend["deadline"].notna().any():
+            df_trend["triwulan"] = df_trend["deadline"].dt.quarter.map(lambda q: f"TW{int(q)}")
             tri_order = ["TW1", "TW2", "TW3", "TW4"]
             triwulan = df_trend.dropna(subset=["triwulan"]).groupby("triwulan").size().reindex(tri_order, fill_value=0).reset_index(name="Jumlah")
             fig = px.bar(triwulan, x="triwulan", y="Jumlah", text="Jumlah", color="triwulan", color_discrete_map={"TW1":"#38bdf8","TW2":"#22c55e","TW3":"#f59e0b","TW4":"#ef4444"})
@@ -976,6 +969,7 @@ def render_dashboard() -> None:
             ]:
                 st.session_state.pop(key, None)
             st.rerun()
+
         tahun_list = sorted([int(x) for x in df["tahun"].dropna().unique().tolist()]) if df["tahun"].notna().any() else [datetime.now().year]
         fc1, fc2 = st.columns(2)
         with fc1:
@@ -983,9 +977,9 @@ def render_dashboard() -> None:
         with fc2:
             triwulan_filter = st.selectbox("TW", ["Semua", "I", "II", "III", "IV"])
         scope = st.selectbox("Tampilan", ["Tugas Saya", "Semua Bahan"] if st.session_state.role == "pic" else ["Semua Bahan"], index=0)
-        keyword = st.text_input("Cari", placeholder="Nama bahan / instruksi")
+        keyword = st.text_input("Cari", placeholder="Nama bahan / Kata Kunci/ Instruksi")
         all_pics = sorted({pic for val in df["pic_list"].astype(str).tolist() for pic in split_pic_list(val)})
-        kantor_list = sorted(df["kantor"].dropna().astype(str).unique().tolist())
+        kantor_list = sorted(pd.Series(df["kantor"].astype(str).apply(normalize_kantor)).dropna().unique().tolist())
         jenis_list = sorted(df["jenis_bahan"].dropna().astype(str).unique().tolist())
         fc3, fc4 = st.columns(2)
         with fc3:
@@ -1016,7 +1010,6 @@ def render_dashboard() -> None:
     sorted_filtered = sort_bahan_df(filtered)
     export_columns = ["tgl_disposisi", "nama_bahan", "kantor", "jenis_bahan", "pic_list", "deadline", "status", "progress", "approval_status", "approved_by", "keterangan", "instruksi", "file_surat", "file_paparan", "file_narasi"]
     export_df = sorted_filtered[[c for c in export_columns if c in sorted_filtered.columns]].copy()
-    
     with st.sidebar:
         st.markdown("---")
         st.download_button("Ekspor Excel", data=dataframe_to_excel_bytes(export_df), file_name=f"daftar_bahan_pimpinan_{tahun_pilih}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)

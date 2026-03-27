@@ -727,8 +727,15 @@ def render_kpi(df: pd.DataFrame) -> None:
     on_progress = int((df["status"] == "On Progress").sum())
     not_started = int((df["status"] == "Not Yet Started").sum())
     approval_pending = int((df["approval_status"] == "Pending Approval").sum())
-    all_pics = {pic for val in df["pic_list"].astype(str).tolist() for pic in split_pic_list(val)}
+
+    active_status_df = df[df["status"].isin(["Not Yet Started", "On Progress"])].copy()
+    all_pics = {
+        pic
+        for val in active_status_df["pic_list"].astype(str).tolist()
+        for pic in split_pic_list(val)
+    }
     total_pic = len(all_pics)
+
     cards = [
         ("TOTAL PAPARAN", total, "#17355c"),
         ("BELUM MULAI", not_started, "#ef4444"),
@@ -737,11 +744,19 @@ def render_kpi(df: pd.DataFrame) -> None:
         ("MENUNGGU APPROVAL", approval_pending, "#0ea5e9"),
         ("PIC AKTIF", total_pic, "#06b6d4"),
     ]
+
     cols = st.columns(len(cards))
     for col, (label, value, color) in zip(cols, cards):
         with col:
-            st.markdown(f"""<div class="kpi-card" style="border-left: 6px solid {color};"><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div></div>""", unsafe_allow_html=True)
-
+            st.markdown(
+                f"""
+                <div class="kpi-card" style="border-left: 6px solid {color};">
+                    <div class="kpi-label">{label}</div>
+                    <div class="kpi-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
     col1, col2, col3 = st.columns(3)
@@ -776,11 +791,11 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
         fig = px.bar(kantor, x="Kantor", y="Jumlah", text="Jumlah", color="Kantor")
         fig.update_traces(textposition="outside"); fig.update_layout(showlegend=False, yaxis=dict(dtick=1), margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig, use_container_width=True)
-    st.markdown(f'<div class="section-title">Tren Bulanan dan Triwulanan berdasarkan Deadline ({tahun_pilih})</div>', unsafe_allow_html=True)
     c4, c5 = st.columns(2)
     df_trend = df.copy()
     df_trend["deadline"] = pd.to_datetime(df_trend["deadline"], errors="coerce")
     with c4:
+        st.markdown(f'<div class="section-title">Tren Bulanan ({tahun_pilih})</div>', unsafe_allow_html=True)
         month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
         if df_trend["deadline"].notna().any():
             df_trend["bulan_num"] = df_trend["deadline"].dt.month
@@ -796,11 +811,12 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
         else:
             st.info("Belum ada data bulanan.")
     with c5:
+        st.markdown(f'<div class="section-title">Tren Triwulanan ({tahun_pilih})</div>', unsafe_allow_html=True)
         if df_trend["deadline"].notna().any():
-            df_trend["triwulan_chart"] = df_trend["deadline"].dt.quarter.map(lambda q: f"TW{int(q)}")
+            df_trend["triwulan"] = df_trend["deadline"].dt.quarter.map(lambda q: f"TW{int(q)}")
             tri_order = ["TW1", "TW2", "TW3", "TW4"]
-            triwulan = df_trend.dropna(subset=["triwulan_chart"]).groupby("triwulan_chart").size().reindex(tri_order, fill_value=0).reset_index(name="Jumlah")
-            fig = px.bar(triwulan, x="triwulan_chart", y="Jumlah", text="Jumlah", color="triwulan_chart", color_discrete_map={"TW1":"#38bdf8","TW2":"#22c55e","TW3":"#f59e0b","TW4":"#ef4444"})
+            triwulan = df_trend.dropna(subset=["triwulan"]).groupby("triwulan").size().reindex(tri_order, fill_value=0).reset_index(name="Jumlah")
+            fig = px.bar(triwulan, x="triwulan", y="Jumlah", text="Jumlah", color="triwulan_chart", color_discrete_map={"TW1":"#38bdf8","TW2":"#22c55e","TW3":"#f59e0b","TW4":"#ef4444"})
             fig.update_traces(textposition="outside"); fig.update_layout(showlegend=False, yaxis=dict(dtick=1), margin=dict(l=10, r=10, t=10, b=10), height=360)
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -808,31 +824,21 @@ def render_charts(df: pd.DataFrame, tahun_pilih: int) -> None:
 
 
 def render_table(df: pd.DataFrame) -> None:
-    st.markdown('<div class="table-card">', unsafe_allow_html=True)
     top1, top2 = st.columns([5, 1])
     with top1:
         st.markdown('<div class="section-title">Daftar Bahan Paparan</div>', unsafe_allow_html=True)
     with top2:
         st.markdown(f'<div style="text-align:right;"><span class="badge">{len(df)} Data</span></div>', unsafe_allow_html=True)
-
-    header_cols = st.columns([0.4, 3.0, 1.1, 1.45, 1.15, 1.0, 1.2, 1.25, 1.25])
+    header_cols = st.columns([0.35, 2.6, 1.05, 1.35, 1.1, 1.0, 1.15, 1.05, 1.2])
     for col, title in zip(header_cols, ["No", "Judul", "Tim Kerja", "PIC", "Status", "Progress", "Approval", "Output", "Aksi"]):
         col.markdown(f"<div class='table-head'>{title}</div>", unsafe_allow_html=True)
     st.divider()
-
     for no, (_, row) in enumerate(df.iterrows(), start=1):
         pill_class = {"Done": "status-done", "On Progress": "status-progress"}.get(row["status"], "status-notyet")
         approval_class = {"Approved": "approval-approved", "Rejected": "approval-rejected"}.get(str(row["approval_status"]), "approval-pending")
         progress = max(0, min(100, int(row["progress"] or 0)))
-        surat_value = str(row["file_surat"] or "").strip()
-        paparan_value = str(row["file_paparan"] or "").strip()
-        narasi_value = str(row["file_narasi"] or "").strip()
-
-        st.markdown("<div class='table-row'>", unsafe_allow_html=True)
-        c0, c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.4, 3.0, 1.1, 1.45, 1.15, 1.0, 1.2, 1.25, 1.25])
-
+        c0, c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.35, 2.6, 1.05, 1.35, 1.1, 1.0, 1.15, 1.05, 1.2])
         c0.write(no)
-
         with c1:
             st.markdown(f"<div class='row-title'><strong>{row['nama_bahan']}</strong></div>", unsafe_allow_html=True)
             if st.session_state.get("role") == "pic" and user_is_in_pic_list(st.session_state.get("user", ""), str(row["pic_list"])):
@@ -840,23 +846,26 @@ def render_table(df: pd.DataFrame) -> None:
             info = []
             if row["jenis_bahan"]:
                 info.append(str(row["jenis_bahan"]))
+            if pd.notna(row["deadline"]):
+                info.append(f"Deadline: {row['deadline'].date()}")
             if info:
-                st.markdown(f"<div class='meta-text'>{' • '.join(info)}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='mini-text'>{' • '.join(info)}</div>", unsafe_allow_html=True)
             deadline_days = row.get("days_to_deadline", None)
             if pd.notna(deadline_days):
                 deadline_days = int(deadline_days)
                 if 0 <= deadline_days <= 3:
-                    label = "H-0 / Hari ini" if deadline_days == 0 else f"H-{deadline_days}"
+                    label = "Hari ini" if deadline_days == 0 else f"H-{deadline_days}"
                     st.markdown(f"<span class='deadline-alert'>⚠ {label}</span>", unsafe_allow_html=True)
-
+                else:
+                    st.markdown("<div class='pic-text'> </div>", unsafe_allow_html=True)
         with c2:
             st.write(row["kantor"] or "-")
+            surat_value = str(row["file_surat"] or "").strip()
             if is_url(surat_value):
                 if st.button("📩 Dispo", key=f"surat_{row['id']}", use_container_width=True):
                     show_link_dialog("Link Disposisi", surat_value)
             else:
-                st.markdown("<div class='action-btn-note'>Tidak ada link</div>", unsafe_allow_html=True)
-
+                st.caption("Dispo: -")
         with c3:
             pics = split_pic_list(str(row["pic_list"]))
             if pics:
@@ -866,33 +875,29 @@ def render_table(df: pd.DataFrame) -> None:
                     st.markdown(f"<div class='pic-text'>+{len(pics)-4} PIC lain</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div class='pic-text'>-</div>", unsafe_allow_html=True)
-
         with c4:
             st.markdown(f"<span class='status-pill {pill_class}'>{row['status']}</span>", unsafe_allow_html=True)
             if row["keterangan"]:
                 st.markdown(f"<div class='mini-text'>{str(row['keterangan'])}</div>", unsafe_allow_html=True)
-
         with c5:
-            st.progress(progress / 100)
-            st.caption(f"{progress}%")
-
+            st.progress(progress / 100); st.caption(f"{progress}%")
         with c6:
             st.markdown(f"<span class='approval-pill {approval_class}'>{row['approval_status']}</span>", unsafe_allow_html=True)
             if row["approved_by"]:
                 st.markdown(f"<div class='mini-text'>Oleh: {row['approved_by']}</div>", unsafe_allow_html=True)
-
         with c7:
+            paparan_value = str(row["file_paparan"] or "").strip()
+            narasi_value = str(row["file_narasi"] or "").strip()
             if is_url(paparan_value):
                 if st.button("📊 Paparan", key=f"paparan_{row['id']}", use_container_width=True):
                     show_link_dialog("Link Paparan", paparan_value)
             else:
-                st.button("📊 Paparan", key=f"paparan_disabled_{row['id']}", disabled=True, use_container_width=True)
+                st.caption("Paparan: -")
             if is_url(narasi_value):
                 if st.button("📝 Narasi", key=f"narasi_{row['id']}", use_container_width=True):
                     show_link_dialog("Link Narasi", narasi_value)
             else:
-                st.button("📝 Narasi", key=f"narasi_disabled_{row['id']}", disabled=True, use_container_width=True)
-
+                st.caption("Narasi: -")
         with c8:
             can_edit = st.session_state.role in {"admin", "atasan"} or user_is_in_pic_list(st.session_state.user, str(row["pic_list"]))
             can_delete = st.session_state.role in {"admin", "atasan"}
@@ -910,9 +915,8 @@ def render_table(df: pd.DataFrame) -> None:
                     st.rerun()
             else:
                 st.button("🗑️ Hapus", key=f"del_disabled_{row['id']}", disabled=True, use_container_width=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
+        st.markdown("<div style='margin:6px 0 2px 0;'></div>", unsafe_allow_html=True)
+        st.divider()
     st.markdown("</div>", unsafe_allow_html=True)
 
 
