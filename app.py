@@ -13,6 +13,24 @@ from google.oauth2.service_account import Credentials
 from gspread.exceptions import APIError
 import time
 
+st.markdown("""
+<style>
+/* HIDE HEADER STREAMLIT */
+header {visibility: hidden;}
+
+/* HIDE MENU (tiga titik kanan atas) */
+#MainMenu {visibility: hidden;}
+
+/* HIDE FOOTER */
+footer {visibility: hidden;}
+
+/* OPTIONAL: remove top padding */
+.block-container {
+    padding-top: 1rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.set_page_config(page_title="Monitoring Disposisi Bahan Pimpinan", layout="wide", initial_sidebar_state="expanded")
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -655,21 +673,70 @@ def render_user_admin() -> None:
 def sort_bahan_df(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
+
     sorted_df = df.copy()
-    sorted_df["status_normalized"] = sorted_df["status"].fillna("").astype(str).str.strip().str.lower()
-    today = pd.Timestamp(datetime.now().date())
-    def priority_bucket(status: str) -> int:
-        if status in ["on progress", "proses", "process"]:
-            return 0
-        if status in ["not yet started", "belum mulai", "not_started", "not started"]:
-            return 1
-        return 2
-    sorted_df["priority_bucket"] = sorted_df["status_normalized"].apply(priority_bucket)
+
+    # Status ranking (Done paling bawah)
+    status_rank_map = {
+        "Not Yet Started": 0,
+        "On Progress": 1,
+        "Done": 2,
+    }
+
+    sorted_df["status_rank"] = sorted_df["status"].map(status_rank_map).fillna(9)
+
+    # Handle deadline kosong (taruh paling bawah)
     sorted_df["deadline_missing"] = sorted_df["deadline"].isna().astype(int)
-    sorted_df["days_to_deadline"] = (sorted_df["deadline"] - today).dt.days
-    sorted_df["days_to_deadline_filled"] = sorted_df["days_to_deadline"].fillna(999999)
-    sorted_df = sorted_df.sort_values(by=["priority_bucket", "deadline_missing", "days_to_deadline_filled", "tgl_disposisi", "id"], ascending=[True, True, True, False, False], na_position="last")
-    return sorted_df.drop(columns=["status_normalized", "priority_bucket", "deadline_missing", "days_to_deadline_filled"], errors="ignore")
+
+    # Convert ke datetime untuk aman
+    sorted_df["deadline_sort"] = pd.to_datetime(sorted_df["deadline"], errors="coerce")
+
+    # Sorting utama
+    sorted_df = sorted_df.sort_values(
+        by=[
+            "status_rank",        # Done otomatis di bawah
+            "deadline_missing",   # yang tidak punya deadline paling bawah
+            "deadline_sort",      # deadline terdekat dulu
+            "id"
+        ],
+        ascending=[True, True, True, True],
+        na_position="last",
+    )
+
+def sort_bahan_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    sorted_df = df.copy()
+
+    # Status ranking (Done paling bawah)
+    status_rank_map = {
+        "Not Yet Started": 0,
+        "On Progress": 1,
+        "Done": 2,
+    }
+
+    sorted_df["status_rank"] = sorted_df["status"].map(status_rank_map).fillna(9)
+
+    # Handle deadline kosong (taruh paling bawah)
+    sorted_df["deadline_missing"] = sorted_df["deadline"].isna().astype(int)
+
+    # Convert ke datetime untuk aman
+    sorted_df["deadline_sort"] = pd.to_datetime(sorted_df["deadline"], errors="coerce")
+
+    # Sorting utama
+    sorted_df = sorted_df.sort_values(
+        by=[
+            "status_rank",        # Done otomatis di bawah
+            "deadline_missing",   # yang tidak punya deadline paling bawah
+            "deadline_sort",      # deadline terdekat dulu
+            "id"
+        ],
+        ascending=[True, True, True, True],
+        na_position="last",
+    )
+
+    return sorted_df.drop(columns=["status_rank", "deadline_missing", "deadline_sort"], errors="ignore")
 
 
 def render_header() -> None:
@@ -896,6 +963,19 @@ def render_dashboard() -> None:
         st.info("Belum ada data bahan."); return
     with st.sidebar:
         st.markdown("---"); st.subheader("Filter")
+        if st.button("Reset Filter", use_container_width=True):
+            for key in [
+                "flt_tahun",
+                "flt_triwulan",
+                "flt_scope",
+                "flt_keyword",
+                "flt_pic",
+                "flt_kantor",
+                "flt_jenis",
+                "flt_approval",
+            ]:
+                st.session_state.pop(key, None)
+            st.rerun()
         tahun_list = sorted([int(x) for x in df["tahun"].dropna().unique().tolist()]) if df["tahun"].notna().any() else [datetime.now().year]
         fc1, fc2 = st.columns(2)
         with fc1:
@@ -936,6 +1016,7 @@ def render_dashboard() -> None:
     sorted_filtered = sort_bahan_df(filtered)
     export_columns = ["tgl_disposisi", "nama_bahan", "kantor", "jenis_bahan", "pic_list", "deadline", "status", "progress", "approval_status", "approved_by", "keterangan", "instruksi", "file_surat", "file_paparan", "file_narasi"]
     export_df = sorted_filtered[[c for c in export_columns if c in sorted_filtered.columns]].copy()
+    
     with st.sidebar:
         st.markdown("---")
         st.download_button("Ekspor Excel", data=dataframe_to_excel_bytes(export_df), file_name=f"daftar_bahan_pimpinan_{tahun_pilih}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
